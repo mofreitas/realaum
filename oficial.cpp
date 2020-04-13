@@ -8,7 +8,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#include <learnopengl/shader_m.h>
+#include <learnopengl/shader.h>
 #include <learnopengl/camera.h>
 #include <learnopengl/model.h>
 
@@ -19,6 +19,8 @@
 
 using namespace cv;
 
+GLFWwindow* initializeProgram(GLuint width, GLuint height);
+void processArgs(int argv, char** argc);
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 void mouse_callback(GLFWwindow *window, double xpos, double ypos);
 void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
@@ -26,29 +28,8 @@ void processInput(GLFWwindow *window);
 unsigned char *cvMat2TexInput(Mat &img); 
 
 // settings
-const unsigned int SCR_WIDTH = 800;
-const unsigned int SCR_HEIGHT = 600;
+bool debugMode = false;
 
-const char *shader =
-    "#version 330 core\n"
-    "layout (location = 0) in vec3 vec;\n"
-    "layout (location = 1) in vec2 aTexCoord;\n"
-    "out vec2 TexCoord;\n"
-    "void main(){\n"
-    "   gl_Position = vec4(vec.x, vec.y, vec.z, 1.0);\n"
-    "   TexCoord = aTexCoord;\n"
-    "}\0";
-
-const char *fragShader =
-    "#version 330 core\n"
-    "in vec2 TexCoord;\n"
-    "out vec4 FragColor;\n"
-    "uniform sampler2D aTexture;\n"
-    "void main(){\n"
-    "    FragColor = texture(aTexture, TexCoord);\n"
-    "}\0";
-
-//Shader ourShader("shader.vert", "shader.frag");
 float vertices[] = {
     //     Position       TexCoord
     -1.0f, 1.0f, 0.0f, 0.0f, 1.0f,  // top left
@@ -56,15 +37,16 @@ float vertices[] = {
     -1.0f, -1.0f, 0.0f, 0.0f, 0.0f, // below left
     1.0f, -1.0f, 0.0f, 1.0f, 0.0f   // below right
 };
-// Set up index
+
 unsigned int indices[] = {
     0, 1, 2,
-    1, 2, 3};
+    1, 2, 3
+};
 
 // camera
 Camera camera(glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3(0.0,1.0, 0.0));
-float lastX = SCR_WIDTH / 2.0f;
-float lastY = SCR_HEIGHT / 2.0f;
+float lastX = 0;
+float lastY = 0;
 bool firstMouse = true;
 
 // timing
@@ -72,46 +54,8 @@ float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
 int main(int argc, char** argv)
-{
-    // glfw: initialize and configure
-    // ------------------------------
-    glfwInit();
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-
-#ifdef __APPLE__
-    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // uncomment this statement to fix compilation on OS X
-#endif
-    bool debugMode = false;
-
-    /*if(argc < 1){
-        cout << "Forma de uso do programa ./oficial -ip <ip> [-d]" << endl;
-        exit(-1);
-    }*/
-
-    string ip;
-    for(int i = 1; i < argc; i++){
-        if(strcmp(argv[i], "-d") == 0){
-            cout << "Modo debug ativo" << endl;
-            debugMode = true;
-            ip = "";
-        }        
-        /*else if(strcmp(argv[i], "-ip") == 0 && !debugMode){
-            assert(argc > i+1);
-            ip = string(argv[i+1]);
-            i++;
-        }*/
-        else{
-            cout << "Comando " << argv[i] << "inválido" << endl;
-            exit(-1);
-        }
-    }
-
-    //if(ip.empty() && !debugMode){
-    //    cout << "Ip não informado" << endl;
-    //    exit(-1);
-    //}
+{    
+    processArgs(argc, argv);
 
     Comunication c(40001, debugMode);
     c.openComunicators(
@@ -121,72 +65,10 @@ int main(int argc, char** argv)
 
     CharucoDetector cd("./cameraParameters.txt");
 
-    Mat frame;
-    //cap >> frame;
-    int width = c.getWidth();
-    int height = c.getHeight();
-    unsigned char *image; // = cvMat2TexInput(frame);
+    GLFWwindow* window = initializeProgram((GLuint)c.getWidth(), (GLuint)c.getHeight());
+    unsigned char *image;    
 
-    // glfw window creation
-    // --------------------
-    GLFWwindow *window = glfwCreateWindow(width, height, "LearnOpenGL", NULL, NULL);
-    if (window == NULL)
-    {
-        std::cout << "Failed to create GLFW window" << std::endl;
-        glfwTerminate();
-        return -1;
-    }
-    glfwMakeContextCurrent(window);
-    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-    glfwSetCursorPosCallback(window, mouse_callback);
-    glfwSetScrollCallback(window, scroll_callback);
-
-    // tell GLFW to capture our mouse
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-
-    // glad: load all OpenGL function pointers
-    // ---------------------------------------
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
-    {
-        std::cout << "Failed to initialize GLAD" << std::endl;
-        return -1;
-    }
-
-    //DESENHA BACKGROUND
-    //Define Shaders
-    unsigned int vertexShader;
-    vertexShader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vertexShader, 1, &shader, NULL);
-    glCompileShader(vertexShader);
-
-    int success;
-    char infoLog[512];
-    glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
-    if (!success)
-    {
-        glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
-        std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n"
-                  << infoLog << std::endl;
-    }
-
-    unsigned int fragmentShader;
-    fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragmentShader, 1, &fragShader, NULL);
-    glCompileShader(fragmentShader);
-
-    glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
-    if (!success)
-    {
-        glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
-        std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n"
-                  << infoLog << std::endl;
-    }
-
-    unsigned int shaderProgram;
-    shaderProgram = glCreateProgram();
-    glAttachShader(shaderProgram, vertexShader);
-    glAttachShader(shaderProgram, fragmentShader);
-    glLinkProgram(shaderProgram);
+    Shader background_shader("./background_shader.vs", "./background_shader.fs");
 
     unsigned int VAO, VBO, EBO;
     glGenVertexArrays(1, &VAO);
@@ -214,9 +96,6 @@ int main(int argc, char** argv)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
-
     // configure global opengl state
     // -----------------------------
     //glEnable(GL_DEPTH_TEST);
@@ -230,13 +109,7 @@ int main(int argc, char** argv)
     Model ourModel("./resources/objects/table2/Table.obj");
 
     c.startComunication();
-    Mat img(c.getHeight(), c.getWidth(), CV_8UC3), reversed(c.getHeight(), c.getWidth(), CV_8UC3);
-    //camera.Up = glm::vec3(0.0,-1.0, 0.0);
-
-    int screenLoc = glGetUniformLocation(shaderProgram, "aTexture");
-    // draw in wireframe
-    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-
+    Mat img(c.getHeight(), c.getWidth(), CV_8UC3), frame;
     glm::mat4 eye(1.0f);
 
     // render loop
@@ -258,22 +131,18 @@ int main(int argc, char** argv)
         glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        glUseProgram(shaderProgram);
-        // // Draw Rectangle
-        // //ourShader.use();
-
+        background_shader.use();
         glActiveTexture(GL_TEXTURE0);
-        glUniform1i(screenLoc, 0);
+        background_shader.setInt("aTexture", 0);
         glBindTexture(GL_TEXTURE_2D, aTexture);
 
         frame = c.readImage();        
         glm::mat4 viewMatrix = cd.get_charuco_extrinsics(frame);
-
         image = cvMat2TexInput(frame);         
 
         if (image)
         {
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, c.getWidth(), c.getHeight(), 0, GL_RGB, GL_UNSIGNED_BYTE, image);
         }
         else
         {
@@ -285,26 +154,15 @@ int main(int argc, char** argv)
 
         //RESETA BIND
         glBindVertexArray(0);
-        glActiveTexture(GL_TEXTURE0);
 
         glEnable(GL_DEPTH_TEST);
 
-        // don't forget to enable shader before setting uniforms
+        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)c.getWidth() / (float)c.getHeight(), 10.0f, 1000.0f);
+        glm::mat4 model = glm::scale(eye, glm::vec3(0.01f, 0.01f, 0.01f)); 
+       
         ourShader.use();
-
-        // view/projection transformations
-        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)width / (float)height, 0.1f, 1000.0f);
-        //glm::mat4 view = matriz_rotacao;//camera.GetViewMatrix();
         ourShader.setMat4("projection", projection);
         ourShader.setMat4("view", viewMatrix);
-
-        // render the loaded model
-        glm::mat4 model = eye;
-        model = glm::scale(model, glm::vec3(0.01f, 0.01f, 0.01f));       // it's a bit too big for our scene, so scale it down
-        //model = glm::translate(model, glm::vec3(pos[3]*20.0, pos[4]*20.0, pos[5]*20.0));
-        //model = glm::rotate(model, glm::radians(90.0f), glm::vec3(1.0,0.0, 0.0));
-        //model = matriz_rotacao * model;
-
         ourShader.setMat4("model", model);
         ourShader.setVec3("viewPos", glm::vec3(viewMatrix[0][3], viewMatrix[1][3], viewMatrix[2][3]));
         ourModel.Draw(ourShader);
@@ -313,10 +171,10 @@ int main(int argc, char** argv)
 
         glPixelStorei(GL_PACK_ALIGNMENT, 4);
         glReadPixels(0, 0, img.cols, img.rows, GL_BGR, GL_UNSIGNED_BYTE, img.data);
+        c.writeImage(img);
+
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // -------------------------------------------------------------------------------
-        //flip(img, reversed, -1);
-        c.writeImage(img);
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
@@ -388,4 +246,57 @@ unsigned char *cvMat2TexInput(Mat &img)
     return image.data;
 }
 
+GLFWwindow* initializeProgram(GLuint width, GLuint height){
+    // glfw: initialize and configure
+    // ------------------------------
+    glfwInit();
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+#ifdef __APPLE__
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // uncomment this statement to fix compilation on OS X
+#endif   
+
+    // glfw window creation
+    // --------------------
+    GLFWwindow *window = glfwCreateWindow(width, height, "Realaum", NULL, NULL);
+    if (window == NULL)
+    {
+        std::cout << "Failed to create GLFW window" << std::endl;
+        glfwTerminate();
+        exit(-1);
+    }
+
+    glfwMakeContextCurrent(window);
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+    glfwSetCursorPosCallback(window, mouse_callback);
+    glfwSetScrollCallback(window, scroll_callback);
+
+    // tell GLFW to capture our mouse
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
+    // glad: load all OpenGL function pointers
+    // ---------------------------------------
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
+        std::cout << "Failed to initialize GLAD" << std::endl;
+        exit(-1);
+    }
+
+    return window;
+}
+
+void processArgs(int argc, char** argv){
+    for(int i = 1; i < argc; i++){
+        if(strcmp(argv[i], "-d") == 0){
+            cout << "Modo debug ativo" << endl;
+            debugMode = true;
+        }  
+        else{
+            cout << "Comando " << argv[i] << "inválido" << endl;
+            exit(-1);
+        }
+    }
+}
 

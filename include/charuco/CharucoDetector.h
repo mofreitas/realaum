@@ -34,9 +34,7 @@ private:
                          mr.at<double>(0, 1), -mr.at<double>(1, 1), -mr.at<double>(2, 1), 0,
                          mr.at<double>(0, 2), -mr.at<double>(1, 2), -mr.at<double>(2, 2), 0,
                          trans_vec[0]       , -trans_vec[1]       , -trans_vec[2]       , 1);          
-        //std::cout << "pre-translation: " << output[3][0] << ", " << output[3][1] << ", " << output[3][2] << std::endl;
         output = glm::rotate(output, glm::radians(90.0f), glm::vec3(1.0,0.0, 0.0));
-        //std::cout << "translation: " << output[3][0] << ", " << output[3][1] << ", " << output[3][1] << std::endl;
         return output;
     }
 
@@ -45,8 +43,6 @@ public:
         this->dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_4X4_250);
         this->board = cv::aruco::CharucoBoard::create(5, 7, 0.07, 0.05, dictionary);
         // camera parameters are read from somewhere
-
-        //this->GL2CVMatrix = glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(1.0,0.0, 0.0));
 
         //TODO implementar calibração
         assert(!calibration_filename.empty());
@@ -60,7 +56,7 @@ public:
     glm::mat4 get_charuco_extrinsics(cv::Mat image){
         cv::Mat imageCopy;
         cv::Vec6d output;
-        image.copyTo(imageCopy);
+        //image.copyTo(imageCopy);
         std::vector<int> ids;
         std::vector<std::vector<cv::Point2f>> corners;
         cv::aruco::detectMarkers(image, dictionary, corners, ids);

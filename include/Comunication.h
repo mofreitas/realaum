@@ -176,10 +176,10 @@ public:
 
     ~Comunication(){
         readDevice = false;
-        output_thread.join();
+        input_thread.join();
 
         if(!this>debugMode)
-            input_thread.join();
+            output_thread.join();
     }
 
     void openComunicators(std::string in_pipe, std::string out_pipe){
