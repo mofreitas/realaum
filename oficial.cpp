@@ -59,9 +59,9 @@ int main(int argc, char** argv)
 
     Comunication c(40001, debugMode);
     c.openComunicators(
-        "v4l2src device=/dev/video0 ! video/x-raw, width=640 ! videorate max-rate=20 ! videoconvert ! queue ! appsink",
-        /*"udpsrc port=5000 ! application/x-rtp, media=video, clock-rate=90000, encoding-name=H264, payload=96, a-framerate=20 ! rtpjitterbuffer drop-on-latency=true ! rtph264depay ! queue ! decodebin ! videoconvert ! queue ! appsink*/
-        "appsrc is-live=true ! queue ! videoscale ! video/x-raw, width={width}, height={height} ! videoconvert ! video/x-raw, format=I420 ! queue ! vaapih264enc quality-level=7 keyframe-period=20 ! video/x-h264, stream-format=avc ! queue ! rtph264pay config-interval=1 ! udpsink host={ip} port=5000");
+        /*"v4l2src device=/dev/video0 ! video/x-raw, width=640 ! videorate max-rate=20 ! videoconvert ! queue ! appsink",*/
+        "udpsrc port=5000 ! application/x-rtp, media=video, clock-rate=90000, encoding-name=H264, payload=96, a-framerate=20 ! rtpjitterbuffer drop-on-latency=true ! rtph264depay ! queue ! decodebin ! videoconvert ! queue ! appsink",
+        "appsrc is-live=true ! queue ! videoscale ! video/x-raw, width={width}, height={height} ! videoconvert ! video/x-raw, format=I420 ! queue ! vaapih264enc quality-level=7 keyframe-period=20 ! video/x-h264, stream-format=avc, profile=baseline ! queue ! rtph264pay config-interval=1 ! udpsink host={ip} port=5000 sync=false");
 
     CharucoDetector cd("./cameraParameters.txt");
 
@@ -171,6 +171,7 @@ int main(int argc, char** argv)
 
         glPixelStorei(GL_PACK_ALIGNMENT, 4);
         glReadPixels(0, 0, img.cols, img.rows, GL_BGR, GL_UNSIGNED_BYTE, img.data);
+        flip(img, img, -1);
         c.writeImage(img);
 
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
@@ -242,7 +243,7 @@ unsigned char *cvMat2TexInput(Mat &img)
 {
     Mat image;
     cvtColor(img, image, COLOR_BGR2RGB);
-    flip(image, image, 0);
+    flip(image, image, -1);
     return image.data;
 }
 

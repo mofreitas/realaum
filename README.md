@@ -7,4 +7,6 @@
     3. sl=tamanho do quadrado em metros
     4. ml=tamanho do marcador em metros
     5. d=dicionario utilizado para gerar tabuleiro
-3. Compila o oficial.cpp e roda utilizando `./oficial -ip <ip> -d` para testar usando a camera do proprio computador.
+3. Compila o oficial.cpp e roda utilizando `./oficial -d` para testar usando a camera do proprio computador.
+
+4. Pipeline do raspiberry: gst-launch-1.0 -vvv v4l2src device=/dev/video0 ! videoconvert ! video/x-raw, width=640 ! videorate ! video/x-raw, framerate=20/1 ! queue ! omxh264enc ! rtph264pay config-interval=1 ! queue ! udpsink port=5000 host=[IP do computador]
