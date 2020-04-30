@@ -9,11 +9,12 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include <learnopengl/shader.h>
-#include <learnopengl/camera.h>
 #include <learnopengl/model.h>
 
 #include <iostream>
+#include <chrono>
 
+#include <opencv2/calib3d.hpp>
 #include <opencv2/opencv.hpp>
 #include "opencv2/core/core.hpp"
 
@@ -22,13 +23,17 @@ using namespace cv;
 GLFWwindow* initializeProgram(GLuint width, GLuint height);
 void processArgs(int argv, char** argc);
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
-void mouse_callback(GLFWwindow *window, double xpos, double ypos);
-void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
+void applyFishEyeDistortion(Mat& img, Mat cameraMatrix, Mat coefficients);
 unsigned char *cvMat2TexInput(Mat &img); 
+Mat initializeBarrelDistortionParameters(int width, int height, Mat cameraMatrix, Mat distCoefficients);
+glm::mat4 getProjetionMatrix(Mat cameraMatrix, int halfScreenWidth, int halfScreenHeight, double near, double far);
 
 // settings
 bool debugMode = false;
+char* pi_credentials;
+string pathToCameraParameters;
+double far=100, near=0.1;
 
 float vertices[] = {
     //     Position       TexCoord
@@ -43,32 +48,30 @@ unsigned int indices[] = {
     1, 2, 3
 };
 
-// camera
-Camera camera(glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3(0.0,1.0, 0.0));
-float lastX = 0;
-float lastY = 0;
-bool firstMouse = true;
-
-// timing
-float deltaTime = 0.0f;
-float lastFrame = 0.0f;
-
 int main(int argc, char** argv)
-{    
+{   
     processArgs(argc, argv);
 
-    Comunication c(40001, debugMode);
-    c.openComunicators(
-        /*"v4l2src device=/dev/video0 ! video/x-raw, width=640 ! videorate max-rate=20 ! videoconvert ! queue ! appsink",*/
-        "udpsrc port=5000 ! application/x-rtp, media=video, clock-rate=90000, encoding-name=H264, payload=96, a-framerate=20 ! rtpjitterbuffer drop-on-latency=true ! rtph264depay ! queue ! decodebin ! videoconvert ! queue ! appsink",
-        "appsrc is-live=true ! queue ! videoscale ! video/x-raw, width={width}, height={height} ! videoconvert ! video/x-raw, format=I420 ! queue ! vaapih264enc quality-level=7 keyframe-period=20 ! video/x-h264, stream-format=avc, profile=baseline ! queue ! rtph264pay config-interval=1 ! udpsink host={ip} port=5000 sync=false");
+    //Read camera intrisics
+    CharucoDetector cd(pathToCameraParameters, debugMode);
 
-    CharucoDetector cd("./cameraParameters.txt");
+    //Create/Open/Start Communication
+    Comunication c(40001, debugMode, cd.getCameraWidth(), cd.getCameraHeight());
 
-    GLFWwindow* window = initializeProgram((GLuint)c.getWidth(), (GLuint)c.getHeight());
-    unsigned char *image;    
-
-    Shader background_shader("./background_shader.vs", "./background_shader.fs");
+    try{
+        c.openComunicators(
+            "appsrc is-live=true ! queue ! videoscale ! video/x-raw, width={width}, height={height} ! videoconvert ! video/x-raw, format=I420 ! queue ! vaapih264enc quality-level=7 keyframe-period=20 ! video/x-h264, stream-format=avc, profile=baseline ! queue ! rtph264pay config-interval=1 ! udpsink host={ip} port=5000 sync=false",
+            pi_credentials == NULL ? string() : pi_credentials,
+            "udpsrc port=5000 ! application/x-rtp, media=video, clock-rate=90000, encoding-name=H264, payload=96, a-framerate=20 ! rtpjitterbuffer drop-on-latency=true ! rtph264depay ! queue ! decodebin ! videoconvert ! queue ! appsink"
+        );
+    }
+    catch(...){
+        return 0;
+    }
+    
+    c.startComunication();
+    
+    GLFWwindow* window = initializeProgram((GLuint)c.getHalfScreenWidth(), (GLuint)c.getHalfScreenHeight());  
 
     unsigned int VAO, VBO, EBO;
     glGenVertexArrays(1, &VAO);
@@ -96,59 +99,63 @@ int main(int argc, char** argv)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-    // configure global opengl state
-    // -----------------------------
-    //glEnable(GL_DEPTH_TEST);
+    // Build and compile shadders
+    Shader ourShader("1.model_loading.vs", "1.model_loading.fs"); 
+    Shader background_shader("./background_shader.vs", "./background_shader.fs");
 
-    // build and compile shaders
-    // -------------------------
-    Shader ourShader("1.model_loading.vs", "1.model_loading.fs");
+    // Load model
+    Model ourModel("./resources/objects/column/column.obj");
 
-    // load models
-    // -----------
-    Model ourModel("./resources/objects/table2/Table.obj");
+    //Obtendo matrix de projeção
+    cd.resizeCameraMatrix(c.getFrameWidth(), c.getFrameHeight());
+    glm::mat4 projection = getProjetionMatrix(
+        cd.getCameraMatrix(), c.getHalfScreenWidth(),
+        c.getHalfScreenHeight(), near, far);
 
-    c.startComunication();
-    Mat img(c.getHeight(), c.getWidth(), CV_8UC3), frame;
+    //Inicializando/Aplicando distorção
+    double coeff_dist[4] = {1, 2, 0, 1.0};
+    Mat pontos_dist, coefficients(1, 4, CV_64FC1, coeff_dist);    
+    pontos_dist = initializeBarrelDistortionParameters(
+        c.getFrameWidth(), c.getFrameHeight(), cd.getCameraMatrix(),
+        coefficients);
+
+    // Auxiliary variables
+    unsigned char* image_data;
+    Mat image_read, image_write(c.getHalfScreenHeight(), c.getHalfScreenWidth(), CV_8UC3);
+    Mat image_barrel, output(c.getScreenHeight(), c.getScreenWidth(), CV_8UC3);    
     glm::mat4 eye(1.0f);
-
-    // render loop
-    // -----------
+    
+    // Render loop
     while (!glfwWindowShouldClose(window))
     {
-        // per-frame time logic
-        // --------------------
-        float currentFrame = glfwGetTime();
-        deltaTime = currentFrame - lastFrame;
-        lastFrame = currentFrame;
-
-        // input
-        // -----
+        // Process keys inputs
         processInput(window);
 
-        // render
-        // ------
+        // Render background
         glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+        //Drawing background       
         background_shader.use();
         glActiveTexture(GL_TEXTURE0);
         background_shader.setInt("aTexture", 0);
-        glBindTexture(GL_TEXTURE_2D, aTexture);
+        glBindTexture(GL_TEXTURE_2D, aTexture);        
 
-        frame = c.readImage();        
-        glm::mat4 viewMatrix = cd.get_charuco_extrinsics(frame);
-        image = cvMat2TexInput(frame);         
+        image_read = c.readImage();
 
-        if (image)
-        {
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, c.getWidth(), c.getHeight(), 0, GL_RGB, GL_UNSIGNED_BYTE, image);
+        //getting viewing matrix from charuco
+        glm::mat4 viewMatrix = cd.getViewMatrix(image_read);
+
+        image_data = cvMat2TexInput(image_read);  
+        if (image_data){
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, c.getHalfScreenWidth(), c.getHalfScreenHeight(), 0, GL_RGB, GL_UNSIGNED_BYTE, image_data);
         }
-        else
-        {
-            std::cout << "Failed to load texture." << std::endl;
+        else{
+            std::cout << "Failed to load texture: Empty image" << std::endl;
+            exit(1);
         }
-
+        
+        //Desenha plano de fundo
         glBindVertexArray(VAO);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
@@ -157,8 +164,7 @@ int main(int argc, char** argv)
 
         glEnable(GL_DEPTH_TEST);
 
-        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)c.getWidth() / (float)c.getHeight(), 10.0f, 1000.0f);
-        glm::mat4 model = glm::scale(eye, glm::vec3(0.01f, 0.01f, 0.01f)); 
+        glm::mat4 model = glm::scale(eye, glm::vec3(0.0001f, 0.0001f, 0.0001f)); 
        
         ourShader.use();
         ourShader.setMat4("projection", projection);
@@ -168,39 +174,37 @@ int main(int argc, char** argv)
         ourModel.Draw(ourShader);
 
         glDisable(GL_DEPTH_TEST);
-
+ 
         glPixelStorei(GL_PACK_ALIGNMENT, 4);
-        glReadPixels(0, 0, img.cols, img.rows, GL_BGR, GL_UNSIGNED_BYTE, img.data);
-        flip(img, img, -1);
-        c.writeImage(img);
+        glReadPixels(0, 0, image_read.cols, image_read.rows, GL_BGR, GL_UNSIGNED_BYTE, image_write.data);
+
+        flip(image_write, image_write, 0);
+        
+        //Applying barrel distortion        
+        remap(image_write, image_write, pontos_dist, noArray(), cv::INTER_LINEAR);
+
+        image_write.copyTo(output(Rect(0, 0, c.getHalfScreenWidth(), c.getHalfScreenHeight())));
+	    image_write.copyTo(output(Rect(c.getHalfScreenWidth(), 0, c.getHalfScreenWidth(), c.getHalfScreenHeight())));        
+        c.writeImage(output);
+
+        imshow("saida", output);
+        if(waitKey(1) == 27) break;         
 
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
-        // -------------------------------------------------------------------------------
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
 
     // glfw: terminate, clearing all previously allocated GLFW resources.
-    // ------------------------------------------------------------------
     glfwTerminate();
     return 0;
 }
 
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
-// ---------------------------------------------------------------------------------------------------------
 void processInput(GLFWwindow *window)
 {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
-
-    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-        camera.ProcessKeyboard(FORWARD, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-        camera.ProcessKeyboard(BACKWARD, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-        camera.ProcessKeyboard(LEFT, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-        camera.ProcessKeyboard(RIGHT, deltaTime);
 }
 
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
@@ -212,38 +216,11 @@ void framebuffer_size_callback(GLFWwindow *window, int width, int height)
     glViewport(0, 0, width, height);
 }
 
-// glfw: whenever the mouse moves, this callback is called
-// -------------------------------------------------------
-void mouse_callback(GLFWwindow *window, double xpos, double ypos)
-{
-    if (firstMouse)
-    {
-        lastX = xpos;
-        lastY = ypos;
-        firstMouse = false;
-    }
-
-    float xoffset = xpos - lastX;
-    float yoffset = lastY - ypos; // reversed since y-coordinates go from bottom to top
-
-    lastX = xpos;
-    lastY = ypos;
-
-    camera.ProcessMouseMovement(xoffset, yoffset);
-}
-
-// glfw: whenever the mouse scroll wheel scrolls, this callback is called
-// ----------------------------------------------------------------------
-void scroll_callback(GLFWwindow *window, double xoffset, double yoffset)
-{
-    camera.ProcessMouseScroll(yoffset);
-}
-
 unsigned char *cvMat2TexInput(Mat &img)
 {
     Mat image;
     cvtColor(img, image, COLOR_BGR2RGB);
-    flip(image, image, -1);
+    flip(image, image, 0);
     return image.data;
 }
 
@@ -254,16 +231,15 @@ GLFWwindow* initializeProgram(GLuint width, GLuint height){
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_VISIBLE, 0);
 
 #ifdef __APPLE__
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // uncomment this statement to fix compilation on OS X
 #endif   
 
     // glfw window creation
-    // --------------------
     GLFWwindow *window = glfwCreateWindow(width, height, "Realaum", NULL, NULL);
-    if (window == NULL)
-    {
+    if (window == NULL) {
         std::cout << "Failed to create GLFW window" << std::endl;
         glfwTerminate();
         exit(-1);
@@ -271,16 +247,9 @@ GLFWwindow* initializeProgram(GLuint width, GLuint height){
 
     glfwMakeContextCurrent(window);
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-    glfwSetCursorPosCallback(window, mouse_callback);
-    glfwSetScrollCallback(window, scroll_callback);
-
-    // tell GLFW to capture our mouse
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
     // glad: load all OpenGL function pointers
-    // ---------------------------------------
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
-    {
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
         std::cout << "Failed to initialize GLAD" << std::endl;
         exit(-1);
     }
@@ -289,15 +258,70 @@ GLFWwindow* initializeProgram(GLuint width, GLuint height){
 }
 
 void processArgs(int argc, char** argv){
+    int n_obg = 2;
+    char obg[][10] = {"-pi\0", "-c\0"};
+
     for(int i = 1; i < argc; i++){
         if(strcmp(argv[i], "-d") == 0){
             cout << "Modo debug ativo" << endl;
             debugMode = true;
         }  
+        else if(strcmp(argv[i], "-pi")==0 && argc > i+1){
+            pi_credentials = argv[i+1];
+            memset(obg[0], '\0', 10);;
+            i++;
+        }
+        else if(strcmp(argv[i], "-c")==0 && argc > i+1){
+            pathToCameraParameters = string(argv[i+1]);
+            memset(obg[1], '\0', 10);;
+            i+=1;
+        }
         else{
             cout << "Comando " << argv[i] << "inválido" << endl;
+            cout << "Usage: ./oficial.out -d -c <path to camera parameters> -pi <user@ip>" << endl;
             exit(-1);
+        }
+    }
+
+    for(int i = 0; i < n_obg; i++){
+        if(strcmp(obg[i], "\0")){
+            cout << "Parameter " << obg[i] << " is required" << endl;
+            exit(0);
         }
     }
 }
 
+/** Inicializa matrix utilizada para distorcer imagem 
+ */
+Mat initializeBarrelDistortionParameters(int width, int height, Mat cameraMatrix, Mat distCoefficients){
+    assert(distCoefficients.cols == 4 && distCoefficients.rows == 1);
+
+    Mat pontos(height, width, CV_32FC2), pontos_dist = Mat(height, width, CV_32FC2);
+    Matx33d camMat = cameraMatrix; //K is my camera matrix estimated by cv::fisheye::calibrate
+    Matx33d camMat_inv = camMat.inv(); //Inverting the camera matrix
+
+    for(int i = 0; i < height; i++){
+        for(int j = 0; j < width; j++){
+            Vec3f v(j, i, 1.0);
+            Vec3f r = camMat_inv * v;
+            pontos.at<Vec2f>(i, j)[0] = r[0];
+            pontos.at<Vec2f>(i, j)[1] = r[1];
+        }
+    }
+
+    fisheye::distortPoints(pontos, pontos_dist, camMat, distCoefficients);
+    return pontos_dist;
+}
+
+void applyBarrelDistortion(Mat& img, Mat& pontos_dist){    
+    remap(img, img, pontos_dist, noArray(), cv::INTER_LINEAR);
+}
+
+glm::mat4 getProjetionMatrix(Mat cameraMatrix, int halfScreenWidth, int halfScreenHeight, double near, double far){
+    return glm::mat4(
+        2.0*cameraMatrix.at<double>(0, 0)/halfScreenWidth, 0, 0, 0,
+        0, 2.0*cameraMatrix.at<double>(1, 1)/halfScreenHeight, 0, 0,
+        1.0 - 2.0*cameraMatrix.at<double>(0, 2)/halfScreenWidth, -1.0 + (2.0*cameraMatrix.at<double>(1, 2))/halfScreenHeight, (near+far)/(near-far), -1,  
+        0, 0, 2*near*far/(near-far), 0
+    );
+}

@@ -38,6 +38,7 @@ the use of this software, even if advised of the possibility of such damage.
 #include <vector>
 #include <iostream>
 #include <ctime>
+#include <cstdlib> 
 
 using namespace std;
 using namespace cv;
@@ -197,9 +198,9 @@ int main(int argc, char *argv[]) {
         inputVideo.open(video);
         waitTime = 0;
     } else {
-        inputVideo.open(camId);
-        inputVideo.set(cv::CAP_PROP_FRAME_WIDTH, 640);
-        inputVideo.set(cv::CAP_PROP_FRAME_HEIGHT, 480);
+        inputVideo.open("v4l2src device=/dev/video0 ! videoscale ! video/x-raw, width=640 ! videocrop right=160 left=160 ! videoconvert ! queue ! appsink", CAP_GSTREAMER);
+        //inputVideo.set(cv::CAP_PROP_FRAME_WIDTH, 640);
+        //inputVideo.set(cv::CAP_PROP_FRAME_HEIGHT, 480);
         waitTime = 10;
     }
 
@@ -249,12 +250,13 @@ int main(int argc, char *argv[]) {
         imshow("out", imageCopy);
         char key = (char)waitKey(waitTime);
         if(key == 27) break;
-        if(key == 'c' && ids.size() > 0) {
+        if(key == 'c' && ids.size() > 4 && corners.size() > 0 && corners.size() == ids.size()) {
             cout << "Frame captured" << endl;
             allCorners.push_back(corners);
             allIds.push_back(ids);
             allImgs.push_back(image);
             imgSize = image.size();
+            cout << "\a";
         }
     }
 
@@ -350,6 +352,10 @@ int main(int argc, char *argv[]) {
             if(key == 27) break;
         }
     }
+    
+    //Salva os formatos possíveis da camera
+    //Sabendo previamente que o index 1 do comando v4l2-ctl --list-formats-ext mostra a saida convencional (sem compressão)
+    system("v4l2-ctl --list-formats-ext | awk 'BEGIN { inicio=100000; fim=100000; initial_index=0; final_index=1 } /Index|Size:/ { if($3 == initial_index) inicio=NR; if ($3 == final_index) fim=NR; if(NR>inicio && NR<fim) print $3 }' > output_formats.txt");
 
     return 0;
 }

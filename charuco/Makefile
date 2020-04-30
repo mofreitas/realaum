@@ -14,7 +14,7 @@ OPENCV_LIBS = -L/usr/include/lib /usr/include/lib/libopencv_dnn.so -lopencv_dnn 
 	$(CC) -I$(INCDIR) $(CFLAGS) $< $(GL_LIBS) -o $@
 
 .cpp:
-	$(GCC) -std=c++11 -O2 -I $(OPENCV_CPP_PATH) $< -o $@ $(OPENCV_LIBS) `pkg-config --cflags --libs gstreamer-1.0`
+	$(GCC) -std=c++11 -O2 -I $(OPENCV_CPP_PATH) $< -o $@.out $(OPENCV_LIBS) `pkg-config --cflags --libs gstreamer-1.0`
 	
 
 

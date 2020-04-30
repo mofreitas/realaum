@@ -15,20 +15,24 @@ private:
     cv::Mat cameraMatrix, distCoeffs;
     glm::mat4 cameraExtrinsicMatrixGL;
     glm::mat4 GL2CVMatrix;
+    int cameraWidth, cameraHeight;
+    bool debugMode;
 
-    bool readCameraParameters(std::string filename, cv::Mat &camMatrix, cv::Mat &distCoeffs) {
+    void readCameraParameters(std::string filename) {
         cv::FileStorage fs(filename, cv::FileStorage::READ);
         if(!fs.isOpened())
-            return false;
-        fs["camera_matrix"] >> camMatrix;
-        fs["distortion_coefficients"] >> distCoeffs;
-        return true;
+            throw 1;
+        fs["camera_matrix"] >> this->cameraMatrix;
+        fs["distortion_coefficients"] >> this->distCoeffs;
+        fs["image_width"] >> cameraWidth;
+        fs["image_height"] >> cameraHeight;
     }
 
     //https://answers.opencv.org/question/23089/opencv-opengl-proper-camera-pose-using-solvepnp/
     glm::mat4 cvVec2glmMat(cv::Vec3d rot_vec, cv::Vec3d trans_vec){
         cv::Mat mr;
         cv::Rodrigues(rot_vec, mr);
+        
         glm::mat4 output = glm::mat4(
                          mr.at<double>(0, 0), -mr.at<double>(1, 0), -mr.at<double>(2, 0), 0, 
                          mr.at<double>(0, 1), -mr.at<double>(1, 1), -mr.at<double>(2, 1), 0,
@@ -39,21 +43,53 @@ private:
     }
 
 public:
-    CharucoDetector(std::string calibration_filename, double far=1000, double near=0.1){
+    CharucoDetector(std::string calibration_filename, bool debugMode=false){
         this->dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_4X4_250);
         this->board = cv::aruco::CharucoBoard::create(5, 7, 0.07, 0.05, dictionary);
+        this->debugMode = debugMode;
         // camera parameters are read from somewhere
 
         //TODO implementar calibração
         assert(!calibration_filename.empty());
-        readCameraParameters(calibration_filename, this->cameraMatrix, this->distCoeffs);   
+        readCameraParameters(calibration_filename);   
+    }
+
+    int getCameraWidth(){
+        return this->cameraWidth;
+    }
+
+    int getCameraHeight(){
+        return this->cameraHeight;
     }
 
     cv::Mat getCameraMatrix(){
         return this->cameraMatrix;
     }
 
-    glm::mat4 get_charuco_extrinsics(cv::Mat image){
+    void resizeCameraMatrix(int newWidth, int newHeight, bool cropped = true){
+        assert(newWidth != 0 && newHeight != 0);
+
+        if(cropped){
+            this->cameraMatrix.at<double>(0, 2) += (double) (newWidth-this->cameraWidth)*0.5;
+            this->cameraMatrix.at<double>(1, 2) += (double) (newHeight-this->cameraHeight)*0.5;
+        }
+        else{
+            this->cameraMatrix.at<double>(0, 0) = (double) this->cameraMatrix.at<double>(0, 0)*newWidth/this->cameraWidth;
+            this->cameraMatrix.at<double>(1, 1) = (double) this->cameraMatrix.at<double>(1, 1)*newHeight/this->cameraHeight;
+            this->cameraMatrix.at<double>(0, 2) = (double) this->cameraMatrix.at<double>(0, 2)*newWidth/this->cameraWidth;
+            this->cameraMatrix.at<double>(1, 2) = (double) this->cameraMatrix.at<double>(1, 2)*newHeight/this->cameraHeight;
+        }
+    }
+
+    cv::Mat getDistCoeffs(){
+        return this->distCoeffs;
+    }
+
+    cv::Mat getDistCoeffs4(){
+        return this->distCoeffs(cv::Rect(0, 0, 4, 1));
+    }
+
+    glm::mat4 getViewMatrix(cv::Mat image){
         cv::Mat imageCopy;
         cv::Vec6d output;
         //image.copyTo(imageCopy);
@@ -72,7 +108,8 @@ public:
                 bool valid = cv::aruco::estimatePoseCharucoBoard(charucoCorners, charucoIds, board, cameraMatrix, distCoeffs, rvec, tvec);
                 // if charuco pose is valid
                 if(valid){
-                    cv::drawFrameAxes(image, cameraMatrix, distCoeffs, rvec, tvec, 0.1, 1);
+                    if(debugMode)
+                        cv::drawFrameAxes(image, cameraMatrix, distCoeffs, rvec, tvec, 0.1, 1);
                     
                     this->cameraExtrinsicMatrixGL = cvVec2glmMat(rvec, tvec);
                 }
