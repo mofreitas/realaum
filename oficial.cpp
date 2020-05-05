@@ -226,7 +226,6 @@ unsigned char *cvMat2TexInput(Mat &img)
 
 GLFWwindow* initializeProgram(GLuint width, GLuint height){
     // glfw: initialize and configure
-    // ------------------------------
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
@@ -260,6 +259,8 @@ GLFWwindow* initializeProgram(GLuint width, GLuint height){
 void processArgs(int argc, char** argv){
     int n_obg = 2;
     char obg[][10] = {"-pi\0", "-c\0"};
+    //Informa se é obrigatório mesmo com o modo debug ativado
+    bool mode_d[] = {false, true};
 
     for(int i = 1; i < argc; i++){
         if(strcmp(argv[i], "-d") == 0){
@@ -278,15 +279,19 @@ void processArgs(int argc, char** argv){
         }
         else{
             cout << "Comando " << argv[i] << "inválido" << endl;
-            cout << "Usage: ./oficial.out -d -c <path to camera parameters> -pi <user@ip>" << endl;
+            cout << "Usage: ./oficial.out -d -c <path to camera parameters> -pi <user@ip>" << endl
+                 << "Options:" << endl 
+                 << "-d : [Opcional] Modo debug" << endl 
+                 << "-c : [Obrigatorio] Informa o caminhos dos da calibracao da camera" << endl
+                 << "-pi: [Obrigatorio se -d não for ativado] informa o usuário@ip do raspberry" << endl;
             exit(-1);
         }
     }
 
     for(int i = 0; i < n_obg; i++){
-        if(strcmp(obg[i], "\0")){
+        if(strcmp(obg[i], "\0") && (mode_d[i] && debugMode)){
             cout << "Parameter " << obg[i] << " is required" << endl;
-            exit(0);
+            exit(1);
         }
     }
 }

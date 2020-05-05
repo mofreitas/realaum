@@ -70,7 +70,7 @@ private:
         processNode(scene->mRootNode, scene);
 
         size_x = biggest_x + (smallest_x < 0 ? smallest_x*-1 : smallest_x);
-        std::cout << size_x << std::endl;
+        //std::cout << size_x << std::endl;
     }
 
     // processes a node in a recursive fashion. Processes each individual mesh located at the node and repeats this process on its children nodes (if any).
