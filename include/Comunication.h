@@ -395,7 +395,7 @@ public:
         }
 
         //Abrindo pipe de entrada
-        if(in_pipe.empty() || this->debugMode){
+        if(pi_ssh_login.empty() || in_pipe.empty() || this->debugMode){
             in_pipe = "v4l2src device=/dev/video0 ! videoscale ! video/x-raw, width=640 ! videorate max-rate={framerate} ! videoconvert ! queue ! appsink";
         }
 
