@@ -1,4 +1,7 @@
-> Instalar o GLFW com o comando `sudo apt install libglfw3`
+> Instalar o GLFW com o comando `sudo apt install libglfw3-dev`
+> Instalar o GLM com o comando `sudo apt install libglm-dev`
+> Instalar o ASSIMP com o comando `sudo apt install libassimp-dev`
+
 
 1. Gera tabuleiro com `/charuco/chessboardGenerator`
 2. Calibra camera com o `/charuco/calib` usando o comando `./calib "../cameraParameters.txt" -h=7 -w=5 -sl=0.07 -ml=0.05 -d=2` com:
