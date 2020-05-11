@@ -25,7 +25,7 @@ void processArgs(int argv, char** argc);
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 void processInput(GLFWwindow *window);
 void applyFishEyeDistortion(Mat& img, Mat cameraMatrix, Mat coefficients);
-unsigned char *cvMat2TexInput(Mat &img); 
+Mat cvMat2TexInput(Mat &img); 
 Mat initializeBarrelDistortionParameters(int width, int height, Mat cameraMatrix, Mat distCoefficients);
 glm::mat4 getProjetionMatrix(Mat cameraMatrix, int halfScreenWidth, int halfScreenHeight, double near, double far);
 
@@ -120,7 +120,7 @@ int main(int argc, char** argv)
         coefficients);
 
     // Auxiliary variables
-    unsigned char* image_data;
+    Mat image_data;
     Mat image_read, image_write(c.getHalfScreenHeight(), c.getHalfScreenWidth(), CV_8UC3);
     Mat image_barrel, output(c.getScreenHeight(), c.getScreenWidth(), CV_8UC3);    
     glm::mat4 eye(1.0f);
@@ -147,8 +147,8 @@ int main(int argc, char** argv)
         glm::mat4 viewMatrix = cd.getViewMatrix(image_read);
 
         image_data = cvMat2TexInput(image_read);  
-        if (image_data){
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, c.getHalfScreenWidth(), c.getHalfScreenHeight(), 0, GL_RGB, GL_UNSIGNED_BYTE, image_data);
+        if (!image_data.empty()){
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, c.getHalfScreenWidth(), c.getHalfScreenHeight(), 0, GL_RGB, GL_UNSIGNED_BYTE, image_data.data);
         }
         else{
             std::cout << "Failed to load texture: Empty image" << std::endl;
@@ -216,12 +216,12 @@ void framebuffer_size_callback(GLFWwindow *window, int width, int height)
     glViewport(0, 0, width, height);
 }
 
-unsigned char *cvMat2TexInput(Mat &img)
+Mat cvMat2TexInput(Mat &img)
 {
     Mat image;
     cvtColor(img, image, COLOR_BGR2RGB);
     flip(image, image, 0);
-    return image.data;
+    return image;
 }
 
 GLFWwindow* initializeProgram(GLuint width, GLuint height){
