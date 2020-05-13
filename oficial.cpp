@@ -111,7 +111,8 @@ int main(int argc, char** argv)
     glm::mat4 projection = getProjetionMatrix(
         cd.getCameraMatrix(), c.getHalfScreenWidth(),
         c.getHalfScreenHeight(), near, far);
-    glm::vec3 scale(1.0f, 1.0f, 1.0f);
+
+    glm::vec3 scale(1.0, 1.0, 1.0), desl(0.0, 0.0, 0.0);
 
     //Inicializando/Aplicando distorção
     double coeff_dist[4] = {1, 2, 0, 1.0};
@@ -165,13 +166,14 @@ int main(int argc, char** argv)
 
         glEnable(GL_DEPTH_TEST);
 
-        glm::mat4 model = glm::scale(eye, scale); 
+        glm::mat4 model = glm::translate(eye, desl);
+        model = glm::scale(model, scale); 
        
         ourShader.use();
         ourShader.setMat4("projection", projection);
         ourShader.setMat4("view", viewMatrix);
         ourShader.setMat4("model", model);
-        ourShader.setVec3("viewPos", glm::vec3(viewMatrix[0][3], viewMatrix[1][3], viewMatrix[2][3]));
+        ourShader.setVec3("viewPos", 0, 0, 0);
         ourModel.Draw(ourShader);
 
         glDisable(GL_DEPTH_TEST);
@@ -193,6 +195,24 @@ int main(int argc, char** argv)
         switch(key){
             case 27:
                 glfwSetWindowShouldClose(window, true);
+                break;
+            case 'w':
+                desl[1] = desl[1] + scale[0];
+                break;
+            case 's':
+                desl[1] = desl[1] - scale[0];
+                break;
+            case 'd':
+                desl[0] = desl[0] + scale[0];
+                break;
+            case 'a':
+                desl[0] = desl[0] - scale[0];
+                break;
+            case 'q':
+                desl[2] = desl[2] + scale[0];
+                break;
+            case 'e':
+                desl[2] = desl[2] - scale[0];
                 break;
             case 'i':
                 scale = scale * 2.0f;
@@ -340,7 +360,7 @@ glm::mat4 getProjetionMatrix(Mat cameraMatrix, int halfScreenWidth, int halfScre
     return glm::mat4(
         2.0*cameraMatrix.at<double>(0, 0)/halfScreenWidth, 0, 0, 0,
         0, 2.0*cameraMatrix.at<double>(1, 1)/halfScreenHeight, 0, 0,
-        1.0 - 2.0*cameraMatrix.at<double>(0, 2)/halfScreenWidth, -1.0 + (2.0*cameraMatrix.at<double>(1, 2))/halfScreenHeight, (near+far)/(near-far), -1,  
+        -(1.0 - 2.0*cameraMatrix.at<double>(0, 2)/halfScreenWidth), -(-1.0 + (2.0*cameraMatrix.at<double>(1, 2))/halfScreenHeight), (-near-far)/(near-far), 1,  
         0, 0, 2*near*far/(near-far), 0
     );
 }

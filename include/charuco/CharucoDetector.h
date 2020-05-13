@@ -30,15 +30,17 @@ private:
 
     //https://answers.opencv.org/question/23089/opencv-opengl-proper-camera-pose-using-solvepnp/
     glm::mat4 cvVec2glmMat(cv::Vec3d rot_vec, cv::Vec3d trans_vec){
-        cv::Mat mr;
+        cv::Matx33d mr;
         cv::Rodrigues(rot_vec, mr);
         
+        //Inverte eixo y, pois é invertido em opencv (eixo y aponta para debaixo da camera)
         glm::mat4 output = glm::mat4(
-                         mr.at<double>(0, 0), -mr.at<double>(1, 0), -mr.at<double>(2, 0), 0, 
-                         mr.at<double>(0, 1), -mr.at<double>(1, 1), -mr.at<double>(2, 1), 0,
-                         mr.at<double>(0, 2), -mr.at<double>(1, 2), -mr.at<double>(2, 2), 0,
-                         trans_vec[0]       , -trans_vec[1]       , -trans_vec[2]       , 1);          
-        output = glm::rotate(output, glm::radians(90.0f), glm::vec3(1.0,0.0, 0.0));
+                         mr(0, 0)    , -mr(1, 0)    , mr(2, 0)    , 0, 
+                         mr(0, 1)    , -mr(1, 1)    , mr(2, 1)    , 0,
+                         mr(0, 2)    , -mr(1, 2)    , mr(2, 2)    , 0,
+                         trans_vec[0], -trans_vec[1], trans_vec[2], 1);          
+        
+        //output = glm::rotate(output, glm::radians(90.0f), glm::vec3(1.0,0.0, 0.0));
         return output;
     }
 
