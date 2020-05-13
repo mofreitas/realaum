@@ -65,7 +65,7 @@ int main()
 #endif
 
     VideoCapture cap;
-    cap.open("./video.mp4");
+    cap.open(0);
     if (!cap.isOpened())
     {
         std::cout << "Camera not opened!" << std::endl;

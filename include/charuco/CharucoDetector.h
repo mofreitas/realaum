@@ -20,8 +20,10 @@ private:
 
     void readCameraParameters(std::string filename) {
         cv::FileStorage fs(filename, cv::FileStorage::READ);
-        if(!fs.isOpened())
+        if(!fs.isOpened()){
+            std::cout << filename << " not found" << std::endl;
             throw 1;
+        }
         fs["camera_matrix"] >> this->cameraMatrix;
         fs["distortion_coefficients"] >> this->distCoeffs;
         fs["image_width"] >> cameraWidth;
@@ -109,7 +111,7 @@ public:
                 // if charuco pose is valid
                 if(valid){
                     if(debugMode)
-                        cv::drawFrameAxes(image, cameraMatrix, distCoeffs, rvec, tvec, 0.1, 1);
+-                       cv::drawFrameAxes(image, cameraMatrix, distCoeffs, rvec, tvec, 0.1, 1);
                     
                     this->cameraExtrinsicMatrixGL = cvVec2glmMat(rvec, tvec);
                 }
