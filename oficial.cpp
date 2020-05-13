@@ -104,13 +104,14 @@ int main(int argc, char** argv)
     Shader background_shader("./background_shader.vs", "./background_shader.fs");
 
     // Load model
-    Model ourModel("./resources/objects/column/column.obj");
+    Model ourModel("./resources/objects/ncc1701/ncc1701.obj");
 
     //Obtendo matrix de projeção
     cd.resizeCameraMatrix(c.getFrameWidth(), c.getFrameHeight());
     glm::mat4 projection = getProjetionMatrix(
         cd.getCameraMatrix(), c.getHalfScreenWidth(),
         c.getHalfScreenHeight(), near, far);
+    glm::vec3 scale(1.0f, 1.0f, 1.0f);
 
     //Inicializando/Aplicando distorção
     double coeff_dist[4] = {1, 2, 0, 1.0};
@@ -164,7 +165,7 @@ int main(int argc, char** argv)
 
         glEnable(GL_DEPTH_TEST);
 
-        glm::mat4 model = glm::scale(eye, glm::vec3(0.0001f, 0.0001f, 0.0001f)); 
+        glm::mat4 model = glm::scale(eye, scale); 
        
         ourShader.use();
         ourShader.setMat4("projection", projection);
@@ -188,7 +189,20 @@ int main(int argc, char** argv)
         c.writeImage(output);
 
         imshow("saida", output);
-        if(waitKey(1) == 27) break;         
+        char key = waitKey(1);
+        switch(key){
+            case 27:
+                glfwSetWindowShouldClose(window, true);
+                break;
+            case 'i':
+                scale = scale * 2.0f;
+                cout << "Scale: " << scale[0] << endl;
+                break;
+            case 'o':
+                scale = scale * 0.5f;
+                cout << "Scale: " << scale[0] << endl;
+                break;
+        }
 
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         glfwSwapBuffers(window);
