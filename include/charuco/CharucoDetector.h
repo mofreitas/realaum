@@ -110,9 +110,8 @@ public:
         this->objectPoints.push_back(cv::Point3f(0                , 0                , 0));  
         this->objectPoints.push_back(cv::Point3f(0                , sq_size*squares_h, 0));
         
-        //Esta ordem de inserção é exigida na documentação, de modo que o tabuleiro fique no centro
-        //do sistema de coordenadas        
-        
+        //Recalcula coordenadas cantos tabuleiro de forma que seu centro fique no centro
+        //do sistema de coordenadas. A ordem dele deve ser igual a de objectPoints            
         this->objectPoints_centralized.push_back(cv::Point3f( sq_size*squares_w/2.0,  sq_size*squares_h/2.0, 0));
         this->objectPoints_centralized.push_back(cv::Point3f( sq_size*squares_w/2.0, -sq_size*squares_h/2.0, 0));
         this->objectPoints_centralized.push_back(cv::Point3f(-sq_size*squares_w/2.0, -sq_size*squares_h/2.0, 0));
@@ -156,6 +155,8 @@ public:
         std::vector<cv::Point3f> objectPoints_topright;
         objectPoints_topright.reserve(4);
 
+        //Recalcula coordenadas cantos tabuleiro de forma que o centro do eixo de coordenadas fique em
+        //cima do canto superior direito do tabuleiro. A ordem de inserção deve ser igual a de objectPoints    
         objectPoints_topright.push_back(cv::Point3f(0                 , 0                 , 0));
         objectPoints_topright.push_back(cv::Point3f(0                 , -sq_size*squares_h, 0));
         objectPoints_topright.push_back(cv::Point3f(-sq_size*squares_w, -sq_size*squares_h, 0));
