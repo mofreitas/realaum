@@ -105,17 +105,18 @@ public:
         
         //Uma vez que o canto inferior esquerdo está no ponto (0, 0, 0), insere localizações dos outros
         //cantos
-        this->objectPoints.push_back(cv::Point3f(0                , sq_size*squares_h, 0));
         this->objectPoints.push_back(cv::Point3f(sq_size*squares_w, sq_size*squares_h, 0));
         this->objectPoints.push_back(cv::Point3f(sq_size*squares_w, 0                , 0));
         this->objectPoints.push_back(cv::Point3f(0                , 0                , 0));  
+        this->objectPoints.push_back(cv::Point3f(0                , sq_size*squares_h, 0));
         
         //Esta ordem de inserção é exigida na documentação, de modo que o tabuleiro fique no centro
         //do sistema de coordenadas        
-        this->objectPoints_centralized.push_back(cv::Point3f(-sq_size*squares_w/2.0,  sq_size*squares_h/2.0, 0));
+        
         this->objectPoints_centralized.push_back(cv::Point3f( sq_size*squares_w/2.0,  sq_size*squares_h/2.0, 0));
         this->objectPoints_centralized.push_back(cv::Point3f( sq_size*squares_w/2.0, -sq_size*squares_h/2.0, 0));
         this->objectPoints_centralized.push_back(cv::Point3f(-sq_size*squares_w/2.0, -sq_size*squares_h/2.0, 0));
+        this->objectPoints_centralized.push_back(cv::Point3f(-sq_size*squares_w/2.0,  sq_size*squares_h/2.0, 0));
 
         /*TODO implementar calibração*/
         assert(!calibration_filename.empty());
@@ -155,10 +156,10 @@ public:
         std::vector<cv::Point3f> objectPoints_topright;
         objectPoints_topright.reserve(4);
 
-        objectPoints_topright.push_back(cv::Point3f(-sq_size*squares_w, 0                 , 0));
         objectPoints_topright.push_back(cv::Point3f(0                 , 0                 , 0));
         objectPoints_topright.push_back(cv::Point3f(0                 , -sq_size*squares_h, 0));
         objectPoints_topright.push_back(cv::Point3f(-sq_size*squares_w, -sq_size*squares_h, 0));
+        objectPoints_topright.push_back(cv::Point3f(-sq_size*squares_w, 0                 , 0));
 
         viewMatrix = getViewMatrix(image);
         if (viewMatrix[0][0] == 0.0f)
@@ -244,13 +245,9 @@ public:
                 bool valid = cv::aruco::estimatePoseCharucoBoard(charucoCorners, charucoIds, board, cameraMatrix, distCoeffs, rvec, tvec);
                 // if charuco pose is valid
                 if(valid){
-<<<<<<< HEAD
                     //if(debugMode)
                     //    cv::drawFrameAxes(image, cameraMatrix, distCoeffs, rvec, tvec, 0.1, 1);
-=======
-                    if(debugMode)
--                       cv::drawFrameAxes(image, cameraMatrix, distCoeffs, rvec, tvec, 0.1, 1);
->>>>>>> master
+
                     
                     getCenterCharucoBoard(image, rvec, tvec, rvec_c, tvec_c);
                     this->cameraExtrinsicMatrixGL = cvVec2glmMat(rvec_c, tvec_c);

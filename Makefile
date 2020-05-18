@@ -5,7 +5,7 @@ CC = gcc
 GCC = g++
 
 OPENCV_CPP_PATH = /usr/include/include/opencv4
-GLAD_PATH = ~/Documentos/realaum/include
+GLAD_PATH = ~/Documentos/TCC/realaum/include
 
 LIBS_PATH = /usr/include/lib
 
