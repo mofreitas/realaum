@@ -24,6 +24,7 @@ GLFWwindow* initializeProgram(GLuint width, GLuint height);
 void processArgs(int argv, char** argc);
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 void processInput(GLFWwindow *window);
+void processInputCV(char key, float& step, glm::mat4& model);
 void applyFishEyeDistortion(Mat& img, Mat cameraMatrix, Mat coefficients);
 Mat cvMat2TexInput(Mat &img); 
 Mat initializeBarrelDistortionParameters(int width, int height, Mat cameraMatrix, Mat distCoefficients);
@@ -34,6 +35,7 @@ bool debugMode = false;
 char* pi_credentials;
 string pathToCameraParameters;
 double far=100, near=0.1;
+char autoScaleAxis = 'n';
 
 float vertices[] = {
     //     Position       TexCoord
@@ -104,15 +106,13 @@ int main(int argc, char** argv)
     Shader background_shader("./background_shader.vs", "./background_shader.fs");
 
     // Load model
-    Model ourModel("./resources/objects/ncc1701/ncc1701.obj");
+    Model ourModel("./resources/objects/column/column.obj");    
 
     //Obtendo matrix de projeção
     cd.resizeCameraMatrix(c.getFrameWidth(), c.getFrameHeight());
     glm::mat4 projection = getProjetionMatrix(
         cd.getCameraMatrix(), c.getHalfScreenWidth(),
         c.getHalfScreenHeight(), near, far);
-
-    glm::vec3 scale(1.0, 1.0, 1.0), desl(0.0, 0.0, 0.0);
 
     //Inicializando/Aplicando distorção
     double coeff_dist[4] = {1, 2, 0, 1.0};
@@ -124,8 +124,12 @@ int main(int argc, char** argv)
     // Auxiliary variables
     Mat image_data;
     Mat image_read, image_write(c.getHalfScreenHeight(), c.getHalfScreenWidth(), CV_8UC3);
-    Mat image_barrel, output(c.getScreenHeight(), c.getScreenWidth(), CV_8UC3);    
-    glm::mat4 eye(1.0f);
+    Mat image_barrel, output(c.getScreenHeight(), c.getScreenWidth(), CV_8UC3); 
+
+    float step = 0.0;
+    glm::vec3 scale(0.0f);
+    glm::mat4 model(1.0f);
+    glm::vec3 trans(1.0f);
     
     // Render loop
     while (!glfwWindowShouldClose(window))
@@ -166,8 +170,11 @@ int main(int argc, char** argv)
 
         glEnable(GL_DEPTH_TEST);
 
-        glm::mat4 model = glm::translate(eye, desl);
-        model = glm::scale(model, scale); 
+        if(scale[0] == 0.0f){
+            scale = cd.getAutoScaleVector(ourModel.getSize(), image_read, autoScaleAxis);
+            step = cd.getCharucoBoardObjSize().width * 0.1;
+            model = glm::scale(glm::mat4(1.0f), scale);
+        }
        
         ourShader.use();
         ourShader.setMat4("projection", projection);
@@ -192,37 +199,11 @@ int main(int argc, char** argv)
 
         imshow("saida", output);
         char key = waitKey(1);
-        switch(key){
-            case 27:
-                glfwSetWindowShouldClose(window, true);
-                break;
-            case 'w':
-                desl[1] = desl[1] + scale[0];
-                break;
-            case 's':
-                desl[1] = desl[1] - scale[0];
-                break;
-            case 'd':
-                desl[0] = desl[0] + scale[0];
-                break;
-            case 'a':
-                desl[0] = desl[0] - scale[0];
-                break;
-            case 'q':
-                desl[2] = desl[2] + scale[0];
-                break;
-            case 'e':
-                desl[2] = desl[2] - scale[0];
-                break;
-            case 'i':
-                scale = scale * 2.0f;
-                cout << "Scale: " << scale[0] << endl;
-                break;
-            case 'o':
-                scale = scale * 0.5f;
-                cout << "Scale: " << scale[0] << endl;
-                break;
-        }
+        if(key == 27)
+            glfwSetWindowShouldClose(window, true);
+        else
+            processInputCV(key, step, model);
+        
 
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         glfwSwapBuffers(window);
@@ -303,20 +284,25 @@ void processArgs(int argc, char** argv){
         }  
         else if(strcmp(argv[i], "-pi")==0 && argc > i+1){
             pi_credentials = argv[i+1];
-            memset(obg[0], '\0', 10);;
+            memset(obg[0], '\0', 10);
             i++;
         }
         else if(strcmp(argv[i], "-c")==0 && argc > i+1){
             pathToCameraParameters = string(argv[i+1]);
-            memset(obg[1], '\0', 10);;
-            i+=1;
+            memset(obg[1], '\0', 10);
+            i++;
+        }
+        else if(strcmp(argv[i], "-a")==0 && argc > i+1){
+            autoScaleAxis = argv[i+1][0];
+            i++;
         }
         else{
             cout << "Comando " << argv[i] << "inválido" << endl;
             cout << "Usage: ./oficial.out -d -c <path to camera parameters> -pi <user@ip>" << endl
                  << "Options:" << endl 
+                 << "-a : [Opcional] Informa o eixo em que o autoscale se baseará. Caso não informado, estará desabilitado" << endl 
                  << "-d : [Opcional] Modo debug" << endl 
-                 << "-c : [Obrigatorio] Informa o caminhos dos da calibracao da camera" << endl
+                 << "-c : [Obrigatorio] Informa o caminhos do arquivo de calibracao da camera" << endl
                  << "-pi: [Obrigatorio se -d não for ativado] informa o usuário@ip do raspberry" << endl;
             exit(-1);
         }
@@ -363,4 +349,60 @@ glm::mat4 getProjetionMatrix(Mat cameraMatrix, int halfScreenWidth, int halfScre
         -(1.0 - 2.0*cameraMatrix.at<double>(0, 2)/halfScreenWidth), -(-1.0 + (2.0*cameraMatrix.at<double>(1, 2))/halfScreenHeight), (-near-far)/(near-far), 1,  
         0, 0, 2*near*far/(near-far), 0
     );
+}
+
+void processInputCV(char key, float& step, glm::mat4& model){
+        int sentido = 1, angle = 0;
+        switch(key){
+            case 'w':
+                //Como a inversão inverte também o movimento, ele deve ser feito no sentido contrário
+                //ao desejado
+                model = glm::translate(glm::inverse(model), glm::vec3(0.0f, -step, 0.0f));
+                model = glm::inverse(model);
+                break;
+            case 's':
+                model = glm::translate(glm::inverse(model), glm::vec3(0.0f, step, 0.0f));
+                model = glm::inverse(model);
+                break;
+            case 'd':
+                model = glm::translate(glm::inverse(model), glm::vec3(-step, 0.0f, 0.0f));
+                model = glm::inverse(model);
+                break;
+            case 'a':
+                model = glm::translate(glm::inverse(model), glm::vec3(step, 0.0f, 0.0f));
+                model = glm::inverse(model);
+                break;
+            case 'q':
+                model = glm::translate(glm::inverse(model), glm::vec3(0.0f, 0.0f, -step));
+                model = glm::inverse(model);
+                break;
+            case 'e':
+                model = glm::translate(glm::inverse(model), glm::vec3(0.0f, 0.0f, step));
+                model = glm::inverse(model);
+                break;
+            case 'Z':
+                model = glm::scale(model, glm::vec3(2.0f, 2.0f, 2.0f));
+                break;
+            case 'z':
+                model = glm::scale(model, glm::vec3(0.5f, 0.5f, 0.5f));
+                break;
+            case 'i':
+                sentido = -1;
+            case 'I':
+                angle = 90.0*sentido;                                
+                model = glm::rotate(model, glm::radians((float) angle), glm::vec3(1.0, 0.0, 0.0));
+                break;
+            case 'j':
+                sentido = -1;
+            case 'J':
+                angle = 90.0*sentido;                               
+                model = glm::rotate(model, glm::radians((float) angle), glm::vec3(0.0, 1.0, 0.0));
+                break;
+            case 'k':
+                sentido = -1;
+            case 'K':
+                angle = 90.0*sentido;                                
+                model = glm::rotate(model, glm::radians((float) angle), glm::vec3(0.0, 0.0, 1.0));
+                break;
+        }     
 }

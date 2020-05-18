@@ -355,7 +355,7 @@ int main(int argc, char *argv[]) {
     
     //Salva os formatos possíveis da camera
     //Sabendo previamente que o index 1 do comando v4l2-ctl --list-formats-ext mostra a saida convencional (sem compressão)
-    system("v4l2-ctl --list-formats-ext | awk 'BEGIN { inicio=100000; fim=100000; initial_index=0; final_index=1 } /Index|Size:/ { if($3 == initial_index) inicio=NR; if ($3 == final_index) fim=NR; if(NR>inicio && NR<fim) print $3 }' > output_formats.txt");
+    //system("v4l2-ctl --list-formats-ext | awk 'BEGIN { inicio=100000; fim=100000; initial_index=0; final_index=1 } /Index|Size:/ { if($3 == initial_index) inicio=NR; if ($3 == final_index) fim=NR; if(NR>inicio && NR<fim) print $3 }' > output_formats.txt");
 
     return 0;
 }

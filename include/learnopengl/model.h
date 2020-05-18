@@ -32,7 +32,7 @@ public:
     vector<Texture> textures_loaded;	// stores all the textures loaded so far, optimization to make sure textures aren't loaded more than once.
     vector<Mesh> meshes;
     string directory;
-    int size_x;
+    glm::vec3 size;
 
     /*  Functions   */
     // constructor, expects a filepath to a 3D model.
@@ -46,9 +46,15 @@ public:
         for(unsigned int i = 0; i < meshes.size(); i++)
             meshes[i].Draw(shader);
     }
+
+    glm::vec3 getSize(){
+        return size;
+    }
     
 private:
     int smallest_x = INT32_MAX, biggest_x = -INT32_MAX;
+    int smallest_y = INT32_MAX, biggest_y = -INT32_MAX;
+    int smallest_z = INT32_MAX, biggest_z = -INT32_MAX;
 
     /*  Functions   */
     // loads a model with supported ASSIMP extensions from file and stores the resulting meshes in the meshes vector.
@@ -69,8 +75,13 @@ private:
         // process ASSIMP's root node recursively
         processNode(scene->mRootNode, scene);
 
-        size_x = biggest_x + (smallest_x < 0 ? smallest_x*-1 : smallest_x);
-        //std::cout << size_x << std::endl;
+        size = glm::vec3(0.0f);
+        size[0] = biggest_x + (smallest_x < 0 ? smallest_x*-1 : smallest_x);
+        size[1] = biggest_y + (smallest_y < 0 ? smallest_y*-1 : smallest_y);
+        size[2] = biggest_z + (smallest_z < 0 ? smallest_z*-1 : smallest_z);
+        cout << "Object size: " << size[0] << ", "
+                                << size[1] << ", "
+                                << size[2] << endl;
     }
 
     // processes a node in a recursive fashion. Processes each individual mesh located at the node and repeats this process on its children nodes (if any).
@@ -110,13 +121,20 @@ private:
             vector.z = mesh->mVertices[i].z;
             vertex.Position = vector;
 
-            if(vector.x < smallest_x){
+            if(vector.x < smallest_x)
                 smallest_x = vector.x;
-            }
-
-            if(vector.x > biggest_x){
+            else if(vector.x > biggest_x)
                 biggest_x = vector.x;
-            }
+
+            if(vector.z < smallest_z)
+                smallest_z = vector.z;
+            else if(vector.z > biggest_z)
+                biggest_z = vector.z;
+
+            if(vector.y < smallest_y)
+                smallest_y = vector.y;
+            else if(vector.y > biggest_y)
+                biggest_y = vector.y;
 
             // normals
             vector.x = mesh->mNormals[i].x;
