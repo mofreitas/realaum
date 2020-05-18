@@ -244,8 +244,13 @@ public:
                 bool valid = cv::aruco::estimatePoseCharucoBoard(charucoCorners, charucoIds, board, cameraMatrix, distCoeffs, rvec, tvec);
                 // if charuco pose is valid
                 if(valid){
+<<<<<<< HEAD
                     //if(debugMode)
                     //    cv::drawFrameAxes(image, cameraMatrix, distCoeffs, rvec, tvec, 0.1, 1);
+=======
+                    if(debugMode)
+-                       cv::drawFrameAxes(image, cameraMatrix, distCoeffs, rvec, tvec, 0.1, 1);
+>>>>>>> master
                     
                     getCenterCharucoBoard(image, rvec, tvec, rvec_c, tvec_c);
                     this->cameraExtrinsicMatrixGL = cvVec2glmMat(rvec_c, tvec_c);
