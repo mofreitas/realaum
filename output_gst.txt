@@ -14,18 +14,11 @@ New clock: GstSystemClock
 /GstPipeline:pipeline0/GstQueue:queue1.GstPad:src: caps = "video/x-h264\,\ stream-format\=\(string\)byte-stream\,\ alignment\=\(string\)au\,\ profile\=\(string\)high\,\ level\=\(string\)4\,\ width\=\(int\)640\,\ height\=\(int\)480\,\ pixel-aspect-ratio\=\(fraction\)1/1\,\ framerate\=\(fraction\)20/1"
 /GstPipeline:pipeline0/GstRtpH264Pay:rtph264pay0.GstPad:sink: caps = "video/x-h264\,\ stream-format\=\(string\)byte-stream\,\ alignment\=\(string\)au\,\ profile\=\(string\)high\,\ level\=\(string\)4\,\ width\=\(int\)640\,\ height\=\(int\)480\,\ pixel-aspect-ratio\=\(fraction\)1/1\,\ framerate\=\(fraction\)20/1"
 /GstPipeline:pipeline0/GstRtpH264Pay:rtph264pay0.GstPad:sink: caps = "video/x-h264\,\ stream-format\=\(string\)byte-stream\,\ alignment\=\(string\)au\,\ profile\=\(string\)high\,\ level\=\(string\)4\,\ width\=\(int\)640\,\ height\=\(int\)480\,\ pixel-aspect-ratio\=\(fraction\)1/1\,\ framerate\=\(fraction\)20/1"
-/GstPipeline:pipeline0/GstRtpH264Pay:rtph264pay0.GstPad:src: caps = "application/x-rtp\,\ media\=\(string\)video\,\ payload\=\(int\)96\,\ clock-rate\=\(int\)90000\,\ encoding-name\=\(string\)H264\,\ ssrc\=\(uint\)2316355539\,\ timestamp-offset\=\(uint\)3204874675\,\ seqnum-offset\=\(uint\)14855"
-/GstPipeline:pipeline0/GstQueue:queue2.GstPad:src: caps = "application/x-rtp\,\ media\=\(string\)video\,\ payload\=\(int\)96\,\ clock-rate\=\(int\)90000\,\ encoding-name\=\(string\)H264\,\ ssrc\=\(uint\)2316355539\,\ timestamp-offset\=\(uint\)3204874675\,\ seqnum-offset\=\(uint\)14855"
-/GstPipeline:pipeline0/GstUDPSink:udpsink0.GstPad:sink: caps = "application/x-rtp\,\ media\=\(string\)video\,\ payload\=\(int\)96\,\ clock-rate\=\(int\)90000\,\ encoding-name\=\(string\)H264\,\ ssrc\=\(uint\)2316355539\,\ timestamp-offset\=\(uint\)3204874675\,\ seqnum-offset\=\(uint\)14855"
-/GstPipeline:pipeline0/GstUDPSink:udpsink0.GstPad:sink: caps = "application/x-rtp\,\ media\=\(string\)video\,\ payload\=\(int\)96\,\ clock-rate\=\(int\)90000\,\ encoding-name\=\(string\)H264\,\ ssrc\=\(uint\)2316355539\,\ timestamp-offset\=\(uint\)3204874675\,\ seqnum-offset\=\(uint\)14855"
-/GstPipeline:pipeline0/GstQueue:queue2.GstPad:src: caps = "application/x-rtp\,\ media\=\(string\)video\,\ clock-rate\=\(int\)90000\,\ encoding-name\=\(string\)H264\,\ sprop-parameter-sets\=\(string\)\"J2QAKKwrQFAe0A8SJqAA\\\,KO4CXLA\\\=\"\,\ payload\=\(int\)96\,\ ssrc\=\(uint\)2316355539\,\ timestamp-offset\=\(uint\)3204874675\,\ seqnum-offset\=\(uint\)14855"
-/GstPipeline:pipeline0/GstUDPSink:udpsink0.GstPad:sink: caps = "application/x-rtp\,\ media\=\(string\)video\,\ clock-rate\=\(int\)90000\,\ encoding-name\=\(string\)H264\,\ sprop-parameter-sets\=\(string\)\"J2QAKKwrQFAe0A8SJqAA\\\,KO4CXLA\\\=\"\,\ payload\=\(int\)96\,\ ssrc\=\(uint\)2316355539\,\ timestamp-offset\=\(uint\)3204874675\,\ seqnum-offset\=\(uint\)14855"
-/GstPipeline:pipeline0/GstRtpH264Pay:rtph264pay0: timestamp = 3204874675
-/GstPipeline:pipeline0/GstRtpH264Pay:rtph264pay0: seqnum = 14855
-^Chandling interrupt.
-Interrupt: Stopping pipeline ...
-Execution ended after 0:01:12.300707802
-Setting pipeline to PAUSED ...
-Setting pipeline to READY ...
-Setting pipeline to NULL ...
-Freeing pipeline ...
+/GstPipeline:pipeline0/GstRtpH264Pay:rtph264pay0.GstPad:src: caps = "application/x-rtp\,\ media\=\(string\)video\,\ payload\=\(int\)96\,\ clock-rate\=\(int\)90000\,\ encoding-name\=\(string\)H264\,\ ssrc\=\(uint\)316688880\,\ timestamp-offset\=\(uint\)139219937\,\ seqnum-offset\=\(uint\)22242"
+/GstPipeline:pipeline0/GstQueue:queue2.GstPad:src: caps = "application/x-rtp\,\ media\=\(string\)video\,\ payload\=\(int\)96\,\ clock-rate\=\(int\)90000\,\ encoding-name\=\(string\)H264\,\ ssrc\=\(uint\)316688880\,\ timestamp-offset\=\(uint\)139219937\,\ seqnum-offset\=\(uint\)22242"
+/GstPipeline:pipeline0/GstUDPSink:udpsink0.GstPad:sink: caps = "application/x-rtp\,\ media\=\(string\)video\,\ payload\=\(int\)96\,\ clock-rate\=\(int\)90000\,\ encoding-name\=\(string\)H264\,\ ssrc\=\(uint\)316688880\,\ timestamp-offset\=\(uint\)139219937\,\ seqnum-offset\=\(uint\)22242"
+/GstPipeline:pipeline0/GstUDPSink:udpsink0.GstPad:sink: caps = "application/x-rtp\,\ media\=\(string\)video\,\ payload\=\(int\)96\,\ clock-rate\=\(int\)90000\,\ encoding-name\=\(string\)H264\,\ ssrc\=\(uint\)316688880\,\ timestamp-offset\=\(uint\)139219937\,\ seqnum-offset\=\(uint\)22242"
+/GstPipeline:pipeline0/GstQueue:queue2.GstPad:src: caps = "application/x-rtp\,\ media\=\(string\)video\,\ clock-rate\=\(int\)90000\,\ encoding-name\=\(string\)H264\,\ sprop-parameter-sets\=\(string\)\"J2QAKKwrQFAe0A8SJqAA\\\,KO4CXLA\\\=\"\,\ payload\=\(int\)96\,\ ssrc\=\(uint\)316688880\,\ timestamp-offset\=\(uint\)139219937\,\ seqnum-offset\=\(uint\)22242"
+/GstPipeline:pipeline0/GstUDPSink:udpsink0.GstPad:sink: caps = "application/x-rtp\,\ media\=\(string\)video\,\ clock-rate\=\(int\)90000\,\ encoding-name\=\(string\)H264\,\ sprop-parameter-sets\=\(string\)\"J2QAKKwrQFAe0A8SJqAA\\\,KO4CXLA\\\=\"\,\ payload\=\(int\)96\,\ ssrc\=\(uint\)316688880\,\ timestamp-offset\=\(uint\)139219937\,\ seqnum-offset\=\(uint\)22242"
+/GstPipeline:pipeline0/GstRtpH264Pay:rtph264pay0: timestamp = 139219937
+/GstPipeline:pipeline0/GstRtpH264Pay:rtph264pay0: seqnum = 22242

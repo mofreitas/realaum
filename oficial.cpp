@@ -303,7 +303,7 @@ void processArgs(int argc, char** argv){
             i++;
         }        
         else if(strcmp(argv[i], "-iphost")==0 && argc > i+1){
-            iphost = std::string(argv[i+1]);
+            iphost = string(argv[i+1]);
             i++;
         }
         else{

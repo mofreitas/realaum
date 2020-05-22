@@ -287,6 +287,7 @@ public:
 
         if(!debugMode){
             assert(std::regex_match (iphost, valid_ip));
+            this->host_ip = iphost;
             assert(port > 0);
             getDeviceAspectRatio(port);
         }
