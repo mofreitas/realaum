@@ -36,6 +36,7 @@ char* pi_credentials;
 string pathToCameraParameters;
 double far=100, near=0.1;
 char autoScaleAxis = 'n';
+string iphost = "\0";
 
 float vertices[] = {
     //     Position       TexCoord
@@ -58,7 +59,7 @@ int main(int argc, char** argv)
     CharucoDetector cd(pathToCameraParameters, debugMode);
 
     //Create/Open/Start Communication
-    Comunication c(40001, debugMode, cd.getCameraWidth(), cd.getCameraHeight());
+    Comunication c(iphost, 40001, debugMode, cd.getCameraWidth(), cd.getCameraHeight());
 
     try{
         c.openComunicators(
@@ -130,6 +131,7 @@ int main(int argc, char** argv)
     glm::vec3 scale(0.0f);
     glm::mat4 model(1.0f);
     glm::vec3 trans(1.0f);
+    glm::vec4 lightPos(10.0f);
     
     // Render loop
     while (!glfwWindowShouldClose(window))
@@ -170,6 +172,7 @@ int main(int argc, char** argv)
 
         glEnable(GL_DEPTH_TEST);
 
+        //Apenas faz a auto escala quando encontra o tabuleiro charuco pela primeira vez
         if(scale[0] == 0.0f){
             scale = cd.getAutoScaleVector(ourModel.getSize(), image_read, autoScaleAxis);
             step = cd.getCharucoBoardObjSize().width * 0.1;
@@ -181,6 +184,8 @@ int main(int argc, char** argv)
         ourShader.setMat4("view", viewMatrix);
         ourShader.setMat4("model", model);
         ourShader.setVec3("viewPos", 0, 0, 0);
+        glm::vec4 lightPosTemp = glm::inverse(model) * lightPos;
+        ourShader.setVec3("lightPos", lightPosTemp[0], lightPosTemp[1], lightPosTemp[2]);
         ourModel.Draw(ourShader);
 
         glDisable(GL_DEPTH_TEST);
@@ -272,14 +277,14 @@ GLFWwindow* initializeProgram(GLuint width, GLuint height){
 }
 
 void processArgs(int argc, char** argv){
-    int n_obg = 2;
-    char obg[][10] = {"-pi\0", "-c\0"};
+    int n_obg = 3;
+    char obg[][10] = {"-pi\0", "-c\0", "-iphost\0"};
     //Informa se é obrigatório mesmo com o modo debug ativado
-    bool mode_d[] = {false, true};
+    bool mode_d[] = {false, true, false};
 
     for(int i = 1; i < argc; i++){
         if(strcmp(argv[i], "-d") == 0){
-            cout << "Modo debug ativo" << endl;
+            cout << "Debug mode enabled" << endl;
             debugMode = true;
         }  
         else if(strcmp(argv[i], "-pi")==0 && argc > i+1){
@@ -294,22 +299,28 @@ void processArgs(int argc, char** argv){
         }
         else if(strcmp(argv[i], "-a")==0 && argc > i+1){
             autoScaleAxis = argv[i+1][0];
+            memset(obg[2], '\0', 10);
+            i++;
+        }        
+        else if(strcmp(argv[i], "-iphost")==0 && argc > i+1){
+            iphost = std::string(argv[i+1]);
             i++;
         }
         else{
-            cout << "Comando " << argv[i] << "inválido" << endl;
+            cout << "Command " << argv[i] << "invalid" << endl;
             cout << "Usage: ./oficial.out -d -c <path to camera parameters> -pi <user@ip>" << endl
                  << "Options:" << endl 
-                 << "-a : [Opcional] Informa o eixo em que o autoscale se baseará. Caso não informado, estará desabilitado" << endl 
-                 << "-d : [Opcional] Modo debug" << endl 
-                 << "-c : [Obrigatorio] Informa o caminhos do arquivo de calibracao da camera" << endl
-                 << "-pi: [Obrigatorio se -d não for ativado] informa o usuário@ip do raspberry" << endl;
+                 << "-a : [Optional] Informs the autoscale axis. Case not informed, autoscale is going to be disabled" << endl 
+                 << "-d : [Optional] Debug mode" << endl 
+                 << "-c : [Required] Informs the path of camera calibration file" << endl
+                 << "-pi: [Required if -d not passed] Informs user@ip of raspberry" << endl
+                 << "-iphost: [Required if -d not passed] Informs ip of computer host" << endl;
             exit(-1);
         }
     }
 
     for(int i = 0; i < n_obg; i++){
-        if(strcmp(obg[i], "\0") && (mode_d[i] && debugMode)){
+        if(strcmp(obg[i], "\0") && !(!mode_d[i] && debugMode)){
             cout << "Parameter " << obg[i] << " is required" << endl;
             exit(1);
         }

@@ -6,7 +6,8 @@
 #include <cstring>
 #include <ctime>
 #include <mutex>
-//#include <fstream>
+#include <regex>
+#include <cassert>
 
 //Fork
 #include <sys/types.h>
@@ -51,7 +52,8 @@ private:
     Resolution frame;
     Resolution screen;
     int framerate;
-    std::string ip;
+    std::string device_ip;
+    std::string host_ip;
     std::mutex output_lock;
     int port;
 
@@ -112,6 +114,10 @@ private:
         return 0;
     }
     
+    /** Mapeia o aspect ratio enviado em aspect ratios predeterminados
+     * 
+     * @param ar Aspect ratio que deseja mapear 
+     */
     void setScreenSize(float ar){
         if(ar_18_9 == ar)
         {
@@ -144,61 +150,11 @@ private:
                   << "x" << screen.height << std::endl;
     }
 
-    /*void getAvailableResolutions(){
-        std::ifstream file("./charuco/output_formats.txt");
-        if (file.is_open()) {
-            std::string line;
-            int w, h;
-            char x;
-            while (file >> w >> x >> h) {
-                this->available_resolutions.push_back(Resolution(w, h));
-            }
-            file.close();
-        }
-    }*/
-
-    /*void setBestInputResolution(){
-        //Size of half screen
-        int h_scr_height = this->screen.height;
-        int h_scr_width = this->screen.width/2;
-
-        //Weight (w) of each scenario
-        int w_overheight = 7;
-        int w_overwidth = 5;
-        int w_underheight = 8;
-        int w_underwidth = 10;
-
-        //Best resolution
-        int best_resolution_id = 0;
-        int best_resolution_points = INT32_MAX;
-
-        for(int i = 0; i < this->available_resolutions.size(); i++){
-            int points = 0;
-            Resolution r = this->available_resolutions.at(i);
-
-            if(r.width > h_scr_width){
-                points += w_overwidth*(r.width-h_scr_width);
-            }
-            else if(r.width < h_scr_width){
-                points -= w_underwidth*(r.width-h_scr_width);
-            }
-
-            if(r.height > h_scr_height){
-                points += w_overheight*(r.height-h_scr_height);
-            }
-            else if(r.height < h_scr_height){
-                points -= w_underheight*(r.height-h_scr_height);
-            }
-
-            if(points < best_resolution_points){
-                best_resolution_points = points;
-                best_resolution_id = i;
-            }
-        }
-
-        camera = this->available_resolutions.at(best_resolution_id);
-    }*/
-
+    /**
+     * Obtem aspect ratio do dispositivo, dado que envie a largura e altura da tela.
+     * 
+     * @param port Porta em que o programa estará esperando conexão do dispositivo móvel
+     */
     void getDeviceAspectRatio(unsigned short port){        
         //Variaveis relacionadas ao socket para obter tamanho tela smartphone
         int server_sockfd, client_sockfd, opt = 1, bind_result, screen_width, screen_height;
@@ -210,8 +166,8 @@ private:
         server_sockfd = socket(AF_INET, SOCK_STREAM, 0);
         if(server_sockfd < 0)
         {
-            std::cout << "socket nao abriu" << std::endl;
-            //return -1;
+            std::cout << "socket not open" << std::endl;
+            throw -1;
         }
         
         //Define que o programa pode reutilizar socket, não precisando esperar
@@ -226,19 +182,19 @@ private:
         bind_result = bind(server_sockfd, (struct sockaddr *) &server_address, server_len);
         if(bind_result < 0)
         {
-            std::cout << "Erro binding port to adress" << std::endl;
+            std::cout << "Error binding port to address" << std::endl;
             throw -1;
         }
 
-        std::cout << "Esperando conexao na porta " << this->port << std::endl;
+        std::cout << "Waiting connection on port " << this->port << std::endl;
         listen(server_sockfd, 1);
         client_len = sizeof(client_address);
         client_sockfd = accept(server_sockfd, (struct sockaddr *) &client_address, (socklen_t*) &client_len);    
         read(client_sockfd, &screen_width, sizeof(int));   
         read(client_sockfd, &screen_height, sizeof(int));
         
-        this->ip = std::string(inet_ntoa(client_address.sin_addr));
-        std::cout << this->ip + " conectado" << std::endl;
+        this->device_ip = std::string(inet_ntoa(client_address.sin_addr));
+        std::cout << this->device_ip + " connected" << std::endl;
         close(client_sockfd);    
         close(server_sockfd);
         
@@ -246,6 +202,13 @@ private:
         setScreenSize(ar); 
     }
 
+    /**
+     * Função que substitui os parâmetros em uma string por seus valores, fazendo ainda a verificação (se há chaves faltantes) da string de entrada
+     * 
+     * @param parameters Lista de palavras chaves entre chaves que a string *pode* ter
+     * @param values Lista dos respectivos valores que cada parâmetro deve assumir
+     * @param string String que originalmente possui os parâmetros e, no final, será a string com os parâmetros substituídos pelos seus respectivos valores
+     */
     void insertParameters(std::vector<std::string> parameters, std::vector<std::string> values, std::string& string_){
         assert(parameters.size() == values.size());
       
@@ -275,55 +238,24 @@ private:
         }
     }
 
-    /*void getOutputCMD(FILE* stream, std::string* outputCMD){
-        if (stream) {
-            while (!feof(stream))
-                if (fgets(buffer, max_buffer, stream) != NULL) outputCMD->append(buffer);
-                
-            pclose(stream);
-        }
-        return std::string::npos
-    }
-
-    bool runScript(std::string cmd, bool wait_finish=true, std::string expected_output = std::string()){
-        std::string outputCMD;
-        FILE* stream;
-        const int max_buffer = 256;
-        char buffer[max_buffer];
-
-        //Redireciona Erro (stderr) para Saída (stdout)
-        cmd.append(" 2>&1");
-
-        stream = popen(cmd.c_str(), "r");
-        std::cout << "Running in background: " << std::endl << cmd << std::endl;
-
-        if(wait_finish){
-            std::thread(&Comunication::getOutputCMD, this, stream, &outputCMD).join();
-            if(outputCMD.empty() || expected_output.compare(outputCMD)==0)
-                return true;
-        }
-        else{
-            this->threads_command.push_back(std::thread(threadLeitura(&Comunication::getOutputCMD, this, stream, &outputCMD));
-            return true;
-        }
-
-        return false;        
-    }*/
-
-    /**Se timeout < 0, espera indefinidamente, se timeout == 0, script não bloqueia a execução do programa
-     * se timeout > 0, espera timeout segundos para concluir
+    /**
+     * Executa comando no shell. 
+     * 
+     * @param command Comando a ser executado no shell
+     * @param timeout Tempo de espera para comando ser concluído antes de cancelá-lo. Se timeout < 0, espera indefinidamente, se timeout == 0, 
+     * script não bloqueia a execução do programa, se timeout > 0, espera timeout segundos para concluir.
      */
     void runScript(std::string command, int timeout = 0){
         pid_t pid = fork();
 
-        //if fork
+        //Se processo filho
         if (pid == 0){  
             std::cout << "Running: " << command << std::endl;     
             execl("/bin/bash", "bash", "-c", command.c_str(), (char *)0);
             //perror("Error: Cannot execute command");
             std::cout << "Error: Cannot execute command" << std::endl;
         }
-        //if parent
+        //Se processo pai
         else if (pid > 0){
             if (timeout < 0){
                 waitpid(pid, NULL, 0);
@@ -342,17 +274,19 @@ private:
             throw -1;
         }
     }
-
+    
 public:
-    Comunication(unsigned short port, bool debugMode = false,
+    Comunication(std::string iphost, unsigned short port, bool debugMode = false,
                  int cameraWidth = 640, int cameraHeight = 480){
 
         this->readDevice = true;
 
         this->debugMode = debugMode;
         this->port = port;
+        std::regex valid_ip("\\b(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\b");
 
         if(!debugMode){
+            assert(std::regex_match (iphost, valid_ip));
             assert(port > 0);
             getDeviceAspectRatio(port);
         }
@@ -379,14 +313,23 @@ public:
         if(!this>debugMode)
             output_thread.join();
     }
-
+    
+    
+    /**
+     * Abre fluxos de entrada e saída de dados do programa
+     * 
+     * @param outpipe Define o pipe **GSTREAMER** que indica
+     * @param pi_ssh_login Informa o login e ip da raspberry seguindo o padrão de acesso pelo terminal: login\@ip
+     * @param in_pipe Informa o pipe **GSTREAMER** de entrada do programa. Por padrão, ele obtem da câmera /dev/video0 conectada ao PC.
+     * @param framerate Informa o framerate de funcionamento do programa. Ele deve ser igual em todos os pipes
+     */
     void openComunicators(std::string out_pipe, std::string pi_ssh_login = std::string(), std::string in_pipe = std::string(), int framerate = 20){
         this->framerate = framerate;
 
         if(!this->debugMode && !pi_ssh_login.empty()){
-            std::string device_pipe = "ssh {pi_ssh_login} -t 'gst-launch-1.0 -vvv v4l2src device=/dev/video0 ! videoconvert ! video/x-raw, width={width}, height={height} ! videorate ! video/x-raw, framerate={framerate}/1 ! queue ! omxh264enc ! queue ! rtph264pay config-interval=1 ! queue ! udpsink port=5000 host=192.168.0.16' > ./output_gst.txt";
-            insertParameters({"{framerate}", "{ip}", "{pi_ssh_login}", "{width}", "{height}"}, 
-                            {std::to_string(framerate), this->ip, pi_ssh_login, std::to_string(camera.width), std::to_string(camera.height)},
+            std::string device_pipe = "ssh {pi_ssh_login} -t 'gst-launch-1.0 -vvv v4l2src device=/dev/video0 ! videoconvert ! video/x-raw, width={width}, height={height} ! videorate ! video/x-raw, framerate={framerate}/1 ! queue ! omxh264enc ! queue ! rtph264pay config-interval=1 ! queue ! udpsink port=5000 host={host}' > ./output_gst.txt";
+            insertParameters({"{framerate}", "{ip}", "{pi_ssh_login}", "{width}", "{height}", "{host}"}, 
+                            {std::to_string(framerate), this->device_ip, pi_ssh_login, std::to_string(camera.width), std::to_string(camera.height), this->host_ip},
                             device_pipe);
 
             runScript(device_pipe);
@@ -415,7 +358,7 @@ public:
         //Abrindo pipe de saída
         if(!this->debugMode){
             insertParameters({"{width}", "{height}", "{ip}"}, 
-                             {std::to_string(this->screen.width), std::to_string(this->screen.height), this->ip},
+                             {std::to_string(this->screen.width), std::to_string(this->screen.height), this->device_ip},
                              out_pipe);           
 
             std:: cout << "outpipe: " << out_pipe << std::endl;
@@ -427,6 +370,9 @@ public:
         } 
     }    
     
+    /**
+     * Inicia threads que fazem a comunicação com dispositivos externos.
+     */
     void startComunication(){
         this->readDevice = true;
         this->input_thread = std::thread(&Comunication::readFromDevice, this);
@@ -480,8 +426,7 @@ public:
         if(lock.try_lock()){            
             this->outFrame = image.clone();
             lock.unlock();
-        }
-        
+        }        
     }
 };
 

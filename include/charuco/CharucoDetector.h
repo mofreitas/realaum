@@ -25,6 +25,11 @@ private:
     int cameraWidth, cameraHeight;
     bool debugMode;
 
+    /**
+     * Lê os parametros da câmera emitidos pelo programa ./charuco/calib
+     * 
+     * @param filename Indica localização do arquivo em que os parâmetros estão contidos.
+     */
     void readCameraParameters(std::string filename) {
         cv::FileStorage fs(filename, cv::FileStorage::READ);
         if(!fs.isOpened()){
@@ -51,8 +56,19 @@ private:
         return output;
     }
     
-    /**https://answers.opencv.org/question/179182/center-of-charuco-board/*/
+    /**
+     * Obtem o centro do tabuleiro do charuco.
+     * 
+     * @param image Referencia da image para obtenção da posição de seus cantos
+     * @param rvec Vetor de rotação do canto inferior direito do tabuleiro
+     * @param tvec Vetor de translação do canto inferior direito do tabuleiro
+     * @param rvec_c Vetor de rotação do centro do tabuleiro
+     * @param tvec_c Vetor de translação do centro do tabuleiro
+     * 
+     * [see](https://answers.opencv.org/question/179182/center-of-charuco-board/)
+     */
     void getCenterCharucoBoard(cv::Mat& image, cv::Vec3d& rvec, cv::Vec3d& tvec, cv::Vec3d& rvec_c, cv::Vec3d& tvec_c){
+        //https://answers.opencv.org/question/179182/center-of-charuco-board
         std::vector<cv::Point2f> imagePoints;
         
         //Projeta os pontos 3d em coordenadas de objeto no plano 2d baseados no rvec e tvec 
@@ -73,6 +89,13 @@ private:
         }        
     }
 
+    /**
+     * Retorna o vetores rvec e tvec a partir da matrix de visualização
+     * 
+     * @param viewMatrix Matrix de visualização retornada pela função cvVec2glmMat
+     * @param rvec Vetor de rotação obtido a partir da matrix de visualização
+     * @param tvec Vetor de translação obtido a partir da matrix de visualização
+     */
     void getRvecTvecFromViewMatrix(const glm::mat4& viewMatrix, cv::Vec3f& rvec, cv::Vec3f& tvec){
         tvec = cv::Vec3f(0, 0, 0);
         tvec[0] = viewMatrix[3][0];

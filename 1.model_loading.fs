@@ -8,6 +8,7 @@ in vec2 TexCoords;
 uniform sampler2D texture_diffuse1; 
 uniform sampler2D texture_specular1; 
 uniform vec3 viewPos;
+uniform vec3 lightPos;
 
 void main()
 {
@@ -18,7 +19,7 @@ void main()
     // diffuse
     vec3 fp = vec3(FragPos.x, FragPos.y, FragPos.z);
     vec3 norm = normalize(normal_vec);
-    vec3 lightDir = normalize(vec3(0.0, 500.0, 500.0) - fp);
+    vec3 lightDir = normalize(lightPos - fp);
     float diff = max(dot(norm, lightDir), 0.0);
     vec4 diffuse = diff * texture(texture_diffuse1, TexCoords);
     
