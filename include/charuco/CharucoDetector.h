@@ -42,12 +42,22 @@ private:
         fs["image_height"] >> cameraHeight;
     }
 
-    //https://answers.opencv.org/question/23089/opencv-opengl-proper-camera-pose-using-solvepnp/
+    /**
+     * Converte o vetor de rotação e o vetor de translação para a matrix de visualização do OPENGL
+     * 
+     * @param rot_vec Vetor de rotação
+     * @param trans_vec Vetor de translação
+     * 
+     * @return Matrix de visualização em OPENGL
+     * 
+     * [see]{https://answers.opencv.org/question/23089/opencv-opengl-proper-camera-pose-using-solvepnp/}
+     */
     glm::mat4 cvVec2glmMat(cv::Vec3d rot_vec, cv::Vec3d trans_vec){
         cv::Matx33d mr;
         cv::Rodrigues(rot_vec, mr);
         
         //Inverte eixo y, pois é invertido em opencv (eixo y aponta para debaixo da camera)
+        //O glm::mat4 é preenchido coluna por coluna
         glm::mat4 output = glm::mat4(
                          mr(0, 0)    , -mr(1, 0)    , mr(2, 0)    , 0, 
                          mr(0, 1)    , -mr(1, 1)    , mr(2, 1)    , 0,
@@ -134,13 +144,12 @@ public:
         this->objectPoints.push_back(cv::Point3f(0                , sq_size*squares_h, 0));
         
         //Recalcula coordenadas cantos tabuleiro de forma que seu centro fique no centro
-        //do sistema de coordenadas. A ordem dele deve ser igual a de objectPoints            
+        //do sistema de coordenadas. A ordem de inserção deve ser igual a de objectPoints            
         this->objectPoints_centralized.push_back(cv::Point3f( sq_size*squares_w/2.0,  sq_size*squares_h/2.0, 0));
         this->objectPoints_centralized.push_back(cv::Point3f( sq_size*squares_w/2.0, -sq_size*squares_h/2.0, 0));
         this->objectPoints_centralized.push_back(cv::Point3f(-sq_size*squares_w/2.0, -sq_size*squares_h/2.0, 0));
         this->objectPoints_centralized.push_back(cv::Point3f(-sq_size*squares_w/2.0,  sq_size*squares_h/2.0, 0));
 
-        /*TODO implementar calibração*/
         assert(!calibration_filename.empty());
         readCameraParameters(calibration_filename);   
     }
@@ -165,6 +174,16 @@ public:
         return this->board->getChessboardSize();
     }
 
+    /**
+     * Função utilizada para redimensionar objeto
+     * 
+     * @param size_object Vetor contendo os tamanhos nos eixos x, y e z do modelo (objeto)
+     * @param image Imagem utilizada para medir o tamanho do tabuleiro
+     * @param axis Eixo indicando qual deve ser o novo tamanho do objeto. Por exemplo, se axis = x,
+     * o tamanho sobre o eixo x do objeto será igual ao tamanho do tabuleiro sobe esse mesmo eixo.
+     * 
+     * @returns Vetor de escala do objeto
+     */
     glm::vec3 getAutoScaleVector(const glm::vec3 size_object, const cv::Mat image, char axis = 'x'){
         
         int squares_w = this->board->getChessboardSize().width;
@@ -186,6 +205,7 @@ public:
         objectPoints_topright.push_back(cv::Point3f(-sq_size*squares_w, 0                 , 0));
 
         viewMatrix = getViewMatrix(image);
+        //Enquanto a viewMatrix for 0 (valor padrão), isso indica que tabuleiro não foi achado
         if (viewMatrix[0][0] == 0.0f)
             return glm::vec3(0.0f, 0.0f,0.0f);
 
@@ -212,14 +232,22 @@ public:
 
         this->charucoBoardObjSize = cv::Size_<float>((float)size_x, (float)size_y);
 
-        //Condição feita apenas no final para que charucoBoardObjSize possa ser preenchido
+        //Condição feita apenas no final da função (em vez de no começo) para que 
+        //charucoBoardObjSize possa ser preenchido
         if(axis != 'x' && axis != 'y' && axis != 'z')
             return glm::vec3(1.0f, 1.0f, 1.0f);
         return scale;
     }    
 
     /**
-        O modo cropped = false apenas funcionas com imagens redimensionadas por meio de software
+     * Obtem a nova matrix da câmera para imagens redimensionadas
+     * 
+     * @param newWidth Nova largura da imagem
+     * @param newHeight Nova altura da imagem
+     * @param newHeight Nova altura da imagem
+     * @param cropped Se for false, indica que a imagem foi redimensionada. Caso seja false, 
+     * assume que a imagem foi cortada. Esta função apenas funciona quando essas operações 
+     * são feitas por software.
     */
     void resizeCameraMatrix(int newWidth, int newHeight, bool cropped = true){
         assert(newWidth != 0 && newHeight != 0);
@@ -248,10 +276,16 @@ public:
         return this->distCoeffs(cv::Rect(0, 0, 4, 1));
     }
 
+    /**
+     * Obtem matriz de visualização da camera. 
+     * 
+     * @param image Imagem da qual tentará obter matrix de visualização.
+     * 
+     * @return Matrix de visualização
+     */
     glm::mat4 getViewMatrix(cv::Mat image){
         cv::Mat imageCopy;
         cv::Vec6d output;
-        //image.copyTo(imageCopy);
         std::vector<int> ids;
         std::vector<std::vector<cv::Point2f>> corners;
         cv::aruco::detectMarkers(image, dictionary, corners, ids);
@@ -266,13 +300,15 @@ public:
                 cv::Vec3d rvec, tvec;
                 //Center vectors
                 cv::Vec3d rvec_c, tvec_c;
+
+                //rvec e tvec são os vetores referentes ao canto superior esquerdo do tabuleiro. Eles
+                //assumem que a camera está no centro do sistema de coordenadas.
                 bool valid = cv::aruco::estimatePoseCharucoBoard(charucoCorners, charucoIds, board, cameraMatrix, distCoeffs, rvec, tvec);
                 // if charuco pose is valid
                 if(valid){
                     //if(debugMode)
                     //    cv::drawFrameAxes(image, cameraMatrix, distCoeffs, rvec, tvec, 0.1, 1);
 
-                    
                     getCenterCharucoBoard(image, rvec, tvec, rvec_c, tvec_c);
                     this->cameraExtrinsicMatrixGL = cvVec2glmMat(rvec_c, tvec_c);
                 }

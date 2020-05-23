@@ -68,6 +68,9 @@ private:
     std::thread thread_leitura;
     std::mutex mutex;
 
+    /**
+     * Obtem seção central da imagem recebida da camera
+     */
     void* readFromDevice(){
         //camera size > frame size <= screen size
         int half_screen_width = this->screen.width/2;
@@ -98,6 +101,9 @@ private:
         return 0;
     }
 
+    /**
+     * A cada 1e9/this->framerate, envia a imagem para dispositivo de exibição
+     */
     void* writeToDevice2(){
         struct timespec req;
         req.tv_sec = 0;
@@ -414,6 +420,9 @@ public:
         return screen.height;
     }
 
+    /**
+     * Obtem imagem da fila de leitura. Caso a fila esteja vazia, retorna a imagem anterior
+     */
     cv::Mat readImage(){
         cv::Mat newActual;
         if(input_queue.try_dequeue(newActual))
@@ -422,6 +431,11 @@ public:
         return this->actual;
     }
 
+    /**
+     * Coloca a imagem para ser enviada para o dispositivo de exibição
+     * 
+     * @param image Imagem a ser enviada
+     */
     void writeImage(cv::Mat image){
         std::unique_lock<std::mutex> lock(mutex, std::defer_lock);
         if(lock.try_lock()){            

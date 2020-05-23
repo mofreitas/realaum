@@ -20,15 +20,71 @@
 
 using namespace cv;
 
+/**
+ * Efetua a inicialização do OPENGL
+ * 
+ * @param width Largura da janela.
+ * @param height Altura da janela.
+ */
 GLFWwindow* initializeProgram(GLuint width, GLuint height);
+
+/**
+ * Processa argumentos passados no momento de execução do programa
+ * 
+ * @param argc Número de parâmetros
+ * @param argv Parâmetros
+ */
 void processArgs(int argv, char** argc);
-void framebuffer_size_callback(GLFWwindow *window, int width, int height);
-void processInput(GLFWwindow *window);
+
+/**
+ * Efetua as operações no objeto baseada na entrda do usuário
+ * 
+ * @param key Tecla pressionada
+ * @param step Salto do movimento de translação, função da escala do objeto
+ * @param model Matriz de model da tranformação de coordenadas
+ */
 void processInputCV(char key, float& step, glm::mat4& model);
-void applyFishEyeDistortion(Mat& img, Mat cameraMatrix, Mat coefficients);
+
+/**
+ * Converte uma matrix OPENCV para dados OPENGL
+ * 
+ * @param img Imagem que será convertida para OPENGL
+ * 
+ * @return Imagem convertida para OPENGL
+ */
 Mat cvMat2TexInput(Mat &img); 
+
+/** 
+ * Inicializa matrix utilizada para distorcer imagem, mapeando os pontos de uma imagem
+ * normal em outra distorcida
+ * 
+ * @param width Largura da imagem a distorcer
+ * @param height Altura da imagem a distorcer
+ * @param cameraMatrix Matriz da câmera da imagem a distorcer
+ * @param distCoefficients Coeficientes de distorção desejado na imagem de saída
+ * 
+ * @return Matriz que mapeia a disposição dos pontos da imagem a ser distorcida
+ */
 Mat initializeBarrelDistortionParameters(int width, int height, Mat cameraMatrix, Mat distCoefficients);
-glm::mat4 getProjetionMatrix(Mat cameraMatrix, int halfScreenWidth, int halfScreenHeight, double near, double far);
+
+/**
+ * Gera a matrix de projeção da trasnformação de coordenadas
+ * 
+ * @param cameraMatrix Matriz intríseca da camera
+ * @param screenWidth Largura da tela
+ * @param screenHeight Altura da tela 
+ * @param near A distância do plano near
+ * @param far A distância do plano far
+ */
+glm::mat4 getProjetionMatrix(Mat cameraMatrix, int screenWidth, int screenHeight, double near, double far);
+
+/**
+ * Aplica a distorção utilizando o mapeamento gerado na função initializeBarrelDistortionParameters
+ * 
+ * @param img Image a ser distorcida
+ * @param pontos_dist Matriz informando nova posição dos pontos da imagem 
+ */
+void applyBarrelDistortion(Mat& img, Mat& pontos_dist);
 
 // settings
 bool debugMode = false;
@@ -136,9 +192,6 @@ int main(int argc, char** argv)
     // Render loop
     while (!glfwWindowShouldClose(window))
     {
-        // Process keys inputs
-        processInput(window);
-
         // Render background
         glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -184,6 +237,7 @@ int main(int argc, char** argv)
         ourShader.setMat4("view", viewMatrix);
         ourShader.setMat4("model", model);
         ourShader.setVec3("viewPos", 0, 0, 0);
+        //Impede da iluminação se movimentar junto com o objeto (mantem fixa)
         glm::vec4 lightPosTemp = glm::inverse(model) * lightPos;
         ourShader.setVec3("lightPos", lightPosTemp[0], lightPosTemp[1], lightPosTemp[2]);
         ourModel.Draw(ourShader);
@@ -196,7 +250,7 @@ int main(int argc, char** argv)
         flip(image_write, image_write, 0);
         
         //Applying barrel distortion        
-        remap(image_write, image_write, pontos_dist, noArray(), cv::INTER_LINEAR);
+        applyBarrelDistortion(image_write, pontos_dist);
 
         image_write.copyTo(output(Rect(0, 0, c.getHalfScreenWidth(), c.getHalfScreenHeight())));
 	    image_write.copyTo(output(Rect(c.getHalfScreenWidth(), 0, c.getHalfScreenWidth(), c.getHalfScreenHeight())));        
@@ -220,24 +274,7 @@ int main(int argc, char** argv)
     return 0;
 }
 
-// process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
-void processInput(GLFWwindow *window)
-{
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-        glfwSetWindowShouldClose(window, true);
-}
-
-// glfw: whenever the window size changed (by OS or user resize) this callback function executes
-// ---------------------------------------------------------------------------------------------
-void framebuffer_size_callback(GLFWwindow *window, int width, int height)
-{
-    // make sure the viewport matches the new window dimensions; note that width and
-    // height will be significantly larger than specified on retina displays.
-    glViewport(0, 0, width, height);
-}
-
-Mat cvMat2TexInput(Mat &img)
-{
+Mat cvMat2TexInput(Mat &img){
     Mat image;
     cvtColor(img, image, COLOR_BGR2RGB);
     flip(image, image, 0);
@@ -265,7 +302,6 @@ GLFWwindow* initializeProgram(GLuint width, GLuint height){
     }
 
     glfwMakeContextCurrent(window);
-    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
     // glad: load all OpenGL function pointers
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
@@ -299,16 +335,16 @@ void processArgs(int argc, char** argv){
         }
         else if(strcmp(argv[i], "-a")==0 && argc > i+1){
             autoScaleAxis = argv[i+1][0];
-            memset(obg[2], '\0', 10);
             i++;
         }        
         else if(strcmp(argv[i], "-iphost")==0 && argc > i+1){
             iphost = string(argv[i+1]);
+            memset(obg[2], '\0', 10);
             i++;
         }
         else{
             cout << "Command " << argv[i] << "invalid" << endl;
-            cout << "Usage: ./oficial.out -d -c <path to camera parameters> -pi <user@ip>" << endl
+            cout << "Minimum usage: ./oficial.out -d -c <path to camera parameters>" << endl
                  << "Options:" << endl 
                  << "-a : [Optional] Informs the autoscale axis. Case not informed, autoscale is going to be disabled" << endl 
                  << "-d : [Optional] Debug mode" << endl 
@@ -327,14 +363,12 @@ void processArgs(int argc, char** argv){
     }
 }
 
-/** Inicializa matrix utilizada para distorcer imagem 
- */
 Mat initializeBarrelDistortionParameters(int width, int height, Mat cameraMatrix, Mat distCoefficients){
     assert(distCoefficients.cols == 4 && distCoefficients.rows == 1);
 
     Mat pontos(height, width, CV_32FC2), pontos_dist = Mat(height, width, CV_32FC2);
-    Matx33d camMat = cameraMatrix; //K is my camera matrix estimated by cv::fisheye::calibrate
-    Matx33d camMat_inv = camMat.inv(); //Inverting the camera matrix
+    Matx33d camMat = cameraMatrix; 
+    Matx33d camMat_inv = camMat.inv(); 
 
     for(int i = 0; i < height; i++){
         for(int j = 0; j < width; j++){
@@ -353,67 +387,67 @@ void applyBarrelDistortion(Mat& img, Mat& pontos_dist){
     remap(img, img, pontos_dist, noArray(), cv::INTER_LINEAR);
 }
 
-glm::mat4 getProjetionMatrix(Mat cameraMatrix, int halfScreenWidth, int halfScreenHeight, double near, double far){
+glm::mat4 getProjetionMatrix(Mat cameraMatrix, int screenWidth, int screenHeight, double near, double far){
     return glm::mat4(
-        2.0*cameraMatrix.at<double>(0, 0)/halfScreenWidth, 0, 0, 0,
-        0, 2.0*cameraMatrix.at<double>(1, 1)/halfScreenHeight, 0, 0,
-        -(1.0 - 2.0*cameraMatrix.at<double>(0, 2)/halfScreenWidth), -(-1.0 + (2.0*cameraMatrix.at<double>(1, 2))/halfScreenHeight), (-near-far)/(near-far), 1,  
+        2.0*cameraMatrix.at<double>(0, 0)/screenWidth, 0, 0, 0,
+        0, 2.0*cameraMatrix.at<double>(1, 1)/screenHeight, 0, 0,
+        -(1.0 - 2.0*cameraMatrix.at<double>(0, 2)/screenWidth), -(-1.0 + (2.0*cameraMatrix.at<double>(1, 2))/screenHeight), (-near-far)/(near-far), 1,  
         0, 0, 2*near*far/(near-far), 0
     );
 }
 
 void processInputCV(char key, float& step, glm::mat4& model){
-        int sentido = 1, angle = 0;
-        switch(key){
-            case 'w':
-                //Como a inversão inverte também o movimento, ele deve ser feito no sentido contrário
-                //ao desejado
-                model = glm::translate(glm::inverse(model), glm::vec3(0.0f, -step, 0.0f));
-                model = glm::inverse(model);
-                break;
-            case 's':
-                model = glm::translate(glm::inverse(model), glm::vec3(0.0f, step, 0.0f));
-                model = glm::inverse(model);
-                break;
-            case 'd':
-                model = glm::translate(glm::inverse(model), glm::vec3(-step, 0.0f, 0.0f));
-                model = glm::inverse(model);
-                break;
-            case 'a':
-                model = glm::translate(glm::inverse(model), glm::vec3(step, 0.0f, 0.0f));
-                model = glm::inverse(model);
-                break;
-            case 'q':
-                model = glm::translate(glm::inverse(model), glm::vec3(0.0f, 0.0f, -step));
-                model = glm::inverse(model);
-                break;
-            case 'e':
-                model = glm::translate(glm::inverse(model), glm::vec3(0.0f, 0.0f, step));
-                model = glm::inverse(model);
-                break;
-            case 'Z':
-                model = glm::scale(model, glm::vec3(2.0f, 2.0f, 2.0f));
-                break;
-            case 'z':
-                model = glm::scale(model, glm::vec3(0.5f, 0.5f, 0.5f));
-                break;
-            case 'i':
-                sentido = -1;
-            case 'I':
-                angle = 90.0*sentido;                                
-                model = glm::rotate(model, glm::radians((float) angle), glm::vec3(1.0, 0.0, 0.0));
-                break;
-            case 'j':
-                sentido = -1;
-            case 'J':
-                angle = 90.0*sentido;                               
-                model = glm::rotate(model, glm::radians((float) angle), glm::vec3(0.0, 1.0, 0.0));
-                break;
-            case 'k':
-                sentido = -1;
-            case 'K':
-                angle = 90.0*sentido;                                
-                model = glm::rotate(model, glm::radians((float) angle), glm::vec3(0.0, 0.0, 1.0));
-                break;
-        }     
+    int sentido = 1, angle = 0;
+    switch(key){
+        case 'w':
+            //Como a inversão inverte também o movimento, ele deve ser feito no sentido contrário
+            //ao desejado
+            model = glm::translate(glm::inverse(model), glm::vec3(0.0f, -step, 0.0f));
+            model = glm::inverse(model);
+            break;
+        case 's':
+            model = glm::translate(glm::inverse(model), glm::vec3(0.0f, step, 0.0f));
+            model = glm::inverse(model);
+            break;
+        case 'd':
+            model = glm::translate(glm::inverse(model), glm::vec3(-step, 0.0f, 0.0f));
+            model = glm::inverse(model);
+            break;
+        case 'a':
+            model = glm::translate(glm::inverse(model), glm::vec3(step, 0.0f, 0.0f));
+            model = glm::inverse(model);
+            break;
+        case 'q':
+            model = glm::translate(glm::inverse(model), glm::vec3(0.0f, 0.0f, -step));
+            model = glm::inverse(model);
+            break;
+        case 'e':
+            model = glm::translate(glm::inverse(model), glm::vec3(0.0f, 0.0f, step));
+            model = glm::inverse(model);
+            break;
+        case 'Z':
+            model = glm::scale(model, glm::vec3(2.0f, 2.0f, 2.0f));
+            break;
+        case 'z':
+            model = glm::scale(model, glm::vec3(0.5f, 0.5f, 0.5f));
+            break;
+        case 'i':
+            sentido = -1;
+        case 'I':
+            angle = 90.0*sentido;                                
+            model = glm::rotate(model, glm::radians((float) angle), glm::vec3(1.0, 0.0, 0.0));
+            break;
+        case 'j':
+            sentido = -1;
+        case 'J':
+            angle = 90.0*sentido;                               
+            model = glm::rotate(model, glm::radians((float) angle), glm::vec3(0.0, 1.0, 0.0));
+            break;
+        case 'k':
+            sentido = -1;
+        case 'K':
+            angle = 90.0*sentido;                                
+            model = glm::rotate(model, glm::radians((float) angle), glm::vec3(0.0, 0.0, 1.0));
+            break;
+    }     
 }
