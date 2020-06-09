@@ -2,9 +2,10 @@
 #define COMUNICATION_CPP
 
 #include <thread>
-#include "./concurrentqueue.h"
+//#include "./concurrentqueue.h"
+#include <atomic>
 #include <cstring>
-#include <ctime>
+#include <chrono>
 #include <mutex>
 #include <regex>
 #include <cassert>
@@ -54,19 +55,16 @@ private:
     int framerate;
     std::string device_ip;
     std::string host_ip;
-    std::mutex output_lock;
     int port;
 
-    moodycamel::ConcurrentQueue<cv::Mat> output_queue;
-    moodycamel::ConcurrentQueue<cv::Mat> input_queue;
     cv::VideoWriter out;
-    cv::VideoCapture cap;    
-    cv::Mat actual;
+    cv::VideoCapture cap; 
     cv::Mat outFrame;
+    cv::Mat inFrame;
     std::thread output_thread;    
     std::thread input_thread;  
-    std::thread thread_leitura;
-    std::mutex mutex;
+    std::mutex outputMutex;
+    std::mutex inputMutex;
 
     /**
      * Obtem seção central da imagem recebida da camera
@@ -85,18 +83,10 @@ private:
 
         while(readDevice.load()){
             cap >> image;
-            image(src_rect).copyTo(output(dst_rect));
-            input_queue.enqueue(output);
-        }
-        return 0;
-    }
-
-    void* writeToDevice(){
-        cv::Mat image;
-        while(readDevice.load()){
-            if(output_queue.try_dequeue(image)){
-                out << image;
-            }
+            image(src_rect).copyTo(output(dst_rect));            
+            
+            std::lock_guard<std::mutex> lock(inputMutex);
+                this->inFrame = output;
         }
         return 0;
     }
@@ -104,17 +94,13 @@ private:
     /**
      * A cada 1e9/this->framerate, envia a imagem para dispositivo de exibição
      */
-    void* writeToDevice2(){
-        struct timespec req;
-        req.tv_sec = 0;
-        req.tv_nsec = 1e9/this->framerate;
-        std::unique_lock<std::mutex> lock(mutex, std::defer_lock);
-
+    void* writeToDevice(){
+        std::chrono::milliseconds duration((int) 1e3/this->framerate);
+        
         while(readDevice){
-            nanosleep(&req, (struct timespec *)NULL);
-            std::lock_guard<std::mutex> lock(mutex);
-                out << this->outFrame;
-                //this->outFrame.release();    
+            std::this_thread::sleep_for(duration);
+            std::lock_guard<std::mutex> lock(outputMutex);
+                out << this->outFrame; 
         }
 
         return 0;
@@ -302,7 +288,7 @@ public:
             this->screen.height = cameraHeight;
         }
 
-        this->actual = cv::Mat(cv::Size(screen.width/2, screen.height), CV_8UC3, cv::Scalar(0, 0, 0));
+        this->inFrame = cv::Mat(cv::Size(screen.width/2, screen.height), CV_8UC3, cv::Scalar(0, 0, 0));
         this->outFrame = cv::Mat(cv::Size(screen.width, screen.height), CV_8UC3, cv::Scalar(0, 0, 0));
 
         this->camera.width = cameraWidth;
@@ -325,18 +311,19 @@ public:
     /**
      * Abre fluxos de entrada e saída de dados do programa
      * 
+     * @param cameraIndex Informa o índice de acesso da câmera 
      * @param outpipe Define o pipe **GSTREAMER** que indica
      * @param pi_ssh_login Informa o login e ip da raspberry seguindo o padrão de acesso pelo terminal: login\@ip
      * @param in_pipe Informa o pipe **GSTREAMER** de entrada do programa. Por padrão, ele obtem da câmera /dev/video0 conectada ao PC.
      * @param framerate Informa o framerate de funcionamento do programa. Ele deve ser igual em todos os pipes
      */
-    void openComunicators(std::string out_pipe, std::string pi_ssh_login = std::string(), std::string in_pipe = std::string(), int framerate = 20){
+    void openComunicators(int cameraIndex, std::string out_pipe, std::string pi_ssh_login = std::string(), std::string in_pipe = std::string(), int framerate = 20){
         this->framerate = framerate;
 
         if(!this->debugMode && !pi_ssh_login.empty()){
-            std::string device_pipe = "ssh {pi_ssh_login} -t 'gst-launch-1.0 -vvv v4l2src device=/dev/video0 ! videoconvert ! video/x-raw, width={width}, height={height} ! videorate ! video/x-raw, framerate={framerate}/1 ! queue ! omxh264enc ! queue ! rtph264pay config-interval=1 ! queue ! udpsink port=5000 host={host}' > ./output_gst.txt";
-            insertParameters({"{framerate}", "{ip}", "{pi_ssh_login}", "{width}", "{height}", "{host}"}, 
-                            {std::to_string(framerate), this->device_ip, pi_ssh_login, std::to_string(camera.width), std::to_string(camera.height), this->host_ip},
+            std::string device_pipe = "ssh {pi_ssh_login} -t 'gst-launch-1.0 -vvv v4l2src device=/dev/video{cameraIndex} ! videoconvert ! video/x-raw, width={width}, height={height} ! videorate ! video/x-raw, framerate={framerate}/1 ! queue ! omxh264enc ! queue ! rtph264pay config-interval=1 ! queue ! udpsink port=5000 host={host}' > ./output_gst.txt";
+            insertParameters({"{framerate}", "{ip}", "{pi_ssh_login}", "{width}", "{height}", "{host}", "{cameraIndex}"}, 
+                            {std::to_string(framerate), this->device_ip, pi_ssh_login, std::to_string(camera.width), std::to_string(camera.height), this->host_ip, std::to_string(cameraIndex)},
                             device_pipe);
 
             runScript(device_pipe);
@@ -346,11 +333,11 @@ public:
 
         //Abrindo pipe de entrada
         if(pi_ssh_login.empty() || in_pipe.empty() || this->debugMode){
-            in_pipe = "v4l2src device=/dev/video0 ! videoscale ! video/x-raw, width=640 ! videorate max-rate={framerate} ! videoconvert ! queue ! appsink";
+            in_pipe = "v4l2src device=/dev/video{cameraIndex} ! videoscale ! video/x-raw, width=640 ! videorate max-rate={framerate} ! videoconvert ! queue ! appsink";
         }
 
-        insertParameters({"{framerate}"}, 
-                         {std::to_string(framerate)},
+        insertParameters({"{framerate}", "{cameraIndex}"}, 
+                         {std::to_string(framerate), std::to_string(cameraIndex)},
                           in_pipe); 
 
         std:: cout << "in_pipe: " << in_pipe << std::endl; 
@@ -385,7 +372,7 @@ public:
         this->input_thread = std::thread(&Comunication::readFromDevice, this);
 
         if(!this->debugMode)
-            this->output_thread = std::thread(&Comunication::writeToDevice2, this);
+            this->output_thread = std::thread(&Comunication::writeToDevice, this);
     }
 
     int getCameraWidth(){
@@ -424,11 +411,8 @@ public:
      * Obtem imagem da fila de leitura. Caso a fila esteja vazia, retorna a imagem anterior
      */
     cv::Mat readImage(){
-        cv::Mat newActual;
-        if(input_queue.try_dequeue(newActual))
-            this->actual = newActual.clone();
-
-        return this->actual;
+        std::lock_guard<std::mutex> lock(inputMutex);          
+        return this->inFrame.clone();
     }
 
     /**
@@ -437,7 +421,7 @@ public:
      * @param image Imagem a ser enviada
      */
     void writeImage(cv::Mat image){
-        std::unique_lock<std::mutex> lock(mutex, std::defer_lock);
+        std::unique_lock<std::mutex> lock(outputMutex, std::defer_lock);
         if(lock.try_lock()){            
             this->outFrame = image.clone();
             lock.unlock();

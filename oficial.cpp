@@ -11,6 +11,7 @@
 #include <learnopengl/shader.h>
 #include <learnopengl/model.h>
 
+#include <stdio.h>
 #include <iostream>
 #include <chrono>
 
@@ -93,6 +94,7 @@ string pathToCameraParameters;
 double far=100, near=0.1;
 char autoScaleAxis = 'n';
 string iphost = "\0";
+int cameraIndex = 0;
 
 float vertices[] = {
     //     Position       TexCoord
@@ -119,6 +121,7 @@ int main(int argc, char** argv)
 
     try{
         c.openComunicators(
+            cameraIndex,
             "appsrc is-live=true ! queue ! videoscale ! video/x-raw, width={width}, height={height} ! videoconvert ! video/x-raw, format=I420 ! queue ! vaapih264enc quality-level=7 keyframe-period=20 ! video/x-h264, stream-format=avc, profile=baseline ! queue ! rtph264pay config-interval=1 ! udpsink host={ip} port=5000 sync=false",
             pi_credentials == NULL ? string() : pi_credentials,
             "udpsrc port=5000 ! application/x-rtp, media=video, clock-rate=90000, encoding-name=H264, payload=96, a-framerate=20 ! rtpjitterbuffer drop-on-latency=true ! rtph264depay ! queue ! decodebin ! videoconvert ! queue ! appsink"
@@ -189,6 +192,14 @@ int main(int argc, char** argv)
     glm::vec3 trans(1.0f);
     glm::vec4 lightPos(10.0f);
     
+    double mean=0;
+    unsigned long int frames = 0;
+    long int frames_times[5] = {0};
+    char fps_text[50] = {'0'};
+    chrono::time_point<std::chrono::steady_clock> begin = chrono::steady_clock::now();
+    chrono::time_point<std::chrono::steady_clock> before = begin;
+    chrono::time_point<std::chrono::steady_clock> end = begin;
+    
     // Render loop
     while (!glfwWindowShouldClose(window))
     {
@@ -253,7 +264,28 @@ int main(int argc, char** argv)
         applyBarrelDistortion(image_write, pontos_dist);
 
         image_write.copyTo(output(Rect(0, 0, c.getHalfScreenWidth(), c.getHalfScreenHeight())));
-	    image_write.copyTo(output(Rect(c.getHalfScreenWidth(), 0, c.getHalfScreenWidth(), c.getHalfScreenHeight())));        
+	    image_write.copyTo(output(Rect(c.getHalfScreenWidth(), 0, c.getHalfScreenWidth(), c.getHalfScreenHeight())));    
+	    
+	    //Draw avg and "momentaneous" (last 5) framerate
+	    if(debugMode){
+	        frames++;	   
+            before = end;
+            end = chrono::steady_clock::now();           
+	        frames_times[(frames-1)%5] = chrono::duration_cast<std::chrono::milliseconds>(end-before).count();
+            
+            mean = 0;
+            for(int i = 0; i < 5; i++){
+                mean+=(double)frames_times[i];
+            }
+            mean = 5000.0/mean;
+            
+            sprintf (fps_text, "avg fps: %f, fps: %f", 
+                (frames*1000.0)/chrono::duration_cast<std::chrono::milliseconds>(end - begin).count(),
+                mean);
+            putText(output, fps_text, Point(30,30), 
+                FONT_HERSHEY_COMPLEX_SMALL, 0.5, Scalar(200,200,250), 1);
+        }	    
+	        
         c.writeImage(output);
 
         imshow("saida", output);
@@ -328,7 +360,7 @@ void processArgs(int argc, char** argv){
             memset(obg[0], '\0', 10);
             i++;
         }
-        else if(strcmp(argv[i], "-c")==0 && argc > i+1){
+        else if(strcmp(argv[i], "-cc")==0 && argc > i+1){
             pathToCameraParameters = string(argv[i+1]);
             memset(obg[1], '\0', 10);
             i++;
@@ -336,7 +368,11 @@ void processArgs(int argc, char** argv){
         else if(strcmp(argv[i], "-a")==0 && argc > i+1){
             autoScaleAxis = argv[i+1][0];
             i++;
-        }        
+        }   
+        else if(strcmp(argv[i], "-c")==0 && argc > i+1){
+            cameraIndex = argv[i+1][0]-'0';
+            i++;
+        }      
         else if(strcmp(argv[i], "-iphost")==0 && argc > i+1){
             iphost = string(argv[i+1]);
             memset(obg[2], '\0', 10);
@@ -347,8 +383,9 @@ void processArgs(int argc, char** argv){
             cout << "Minimum usage: ./oficial.out -d -c <path to camera parameters>" << endl
                  << "Options:" << endl 
                  << "-a : [Optional] Informs the autoscale axis. Case not informed, autoscale is going to be disabled" << endl 
-                 << "-d : [Optional] Debug mode" << endl 
-                 << "-c : [Required] Informs the path of camera calibration file" << endl
+                 << "-d : [Optional] Debug mode" << endl
+                 << "-c : [Optional] Informs index of local camera (-d) or pi camera (-pi). Default: 0" << endl 
+                 << "-cc : [Required] Informs the path of camera calibration file" << endl
                  << "-pi: [Required if -d not passed] Informs user@ip of raspberry" << endl
                  << "-iphost: [Required if -d not passed] Informs ip of computer host" << endl;
             exit(-1);

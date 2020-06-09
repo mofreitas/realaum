@@ -85,8 +85,8 @@ private:
         //Neste caso, verifica qual a projeção 2d dos quatro cantos do tabuleiro          
         cv::projectPoints(this->objectPoints, rvec, tvec, this->cameraMatrix, this->distCoeffs, imagePoints);       
         
-        //O frame axis é sempre desenhado no origem (rvec e tvec), por isso, posiciona  objeto de forma
-        //que seu meio fique no centro        
+        //O frame axis é sempre desenhado na origem do mundo(rvec e tvec), por isso, posiciona  objeto de forma
+        //que seu meio fique no centro do mundo      
         cv::solvePnP(this->objectPoints_centralized, imagePoints, this->cameraMatrix, this->distCoeffs, rvec_c, tvec_c);
         
         //Desenha círculos na ponta de tabuleiro e o eixo e coordenadas
@@ -233,7 +233,7 @@ public:
         this->charucoBoardObjSize = cv::Size_<float>((float)size_x, (float)size_y);
 
         //Condição feita apenas no final da função (em vez de no começo) para que 
-        //charucoBoardObjSize possa ser preenchido
+        //charucoBoardObjSize possa ser preenchido.
         if(axis != 'x' && axis != 'y' && axis != 'z')
             return glm::vec3(1.0f, 1.0f, 1.0f);
         return scale;
