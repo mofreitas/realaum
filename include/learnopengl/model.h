@@ -152,7 +152,7 @@ private:
                 vertex.TexCoords = vec;
             }
             else
-                vertex.TexCoords = glm::vec2(0.0f, 0.0f);
+                vertex.TexCoords = glm::vec2(-1.0f, -1.0f);
             // tangent
             /*vector.x = mesh->mTangents[i].x;
             vector.y = mesh->mTangents[i].y;

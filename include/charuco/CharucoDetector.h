@@ -11,6 +11,8 @@
 
 class CharucoDetector{
 private:
+    const static int FRAMES = 3;
+
     cv::Ptr<cv::aruco::Dictionary> dictionary;
     cv::Ptr<cv::aruco::CharucoBoard> board;
     cv::Mat cameraMatrix, distCoeffs;
@@ -22,7 +24,8 @@ private:
     std::vector<cv::Point3f> objectPoints;
     std::vector<cv::Point3f> objectPoints_centralized;
 
-    int cameraWidth, cameraHeight;
+    cv::Mat mean_tvec, mean_rvec;
+    int cameraWidth, cameraHeight, frame_index;
     bool debugMode;
 
     /**
@@ -127,10 +130,14 @@ private:
 
 public:
     CharucoDetector(std::string calibration_filename, bool debugMode=false){
-        this->dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_4X4_250);
+        this->dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_5X5_50);
         this->board = cv::aruco::CharucoBoard::create(5, 7, 0.07, 0.05, dictionary);
         this->debugMode = debugMode;
-        this->cameraExtrinsicMatrixGL = glm::mat4(0.0f);        
+        this->cameraExtrinsicMatrixGL = glm::mat4(0.0f); 
+        this->frame_index = 0; 
+        this->mean_tvec = cv::Mat(FRAMES, 1, CV_64FC3, cv::Scalar(0.0f, 0.0f, 0.0f));
+        this->mean_rvec = cv::Mat(FRAMES, 1, CV_64FC3, cv::Scalar(0.0f, 0.0f, 0.0f));
+        //brvec = cv::Vec3f(0.0, 0.0, 0.0); btvec= cv::Vec3f(0.0, 0.0, 0.0);
         
         int squares_w = this->board->getChessboardSize().width;
         int squares_h = this->board->getChessboardSize().height;
@@ -300,17 +307,21 @@ public:
                 cv::Vec3d rvec, tvec;
                 //Center vectors
                 cv::Vec3d rvec_c, tvec_c;
+                cv::Mat rvec_m, tvec_m;
 
                 //rvec e tvec são os vetores referentes ao canto superior esquerdo do tabuleiro. Eles
                 //assumem que a camera está no centro do sistema de coordenadas.
                 bool valid = cv::aruco::estimatePoseCharucoBoard(charucoCorners, charucoIds, board, cameraMatrix, distCoeffs, rvec, tvec);
                 // if charuco pose is valid
                 if(valid){
-                    //if(debugMode)
-                    //    cv::drawFrameAxes(image, cameraMatrix, distCoeffs, rvec, tvec, 0.1, 1);
-
                     getCenterCharucoBoard(image, rvec, tvec, rvec_c, tvec_c);
-                    this->cameraExtrinsicMatrixGL = cvVec2glmMat(rvec_c, tvec_c);
+
+                    mean_tvec.at<cv::Vec3d>(frame_index) = tvec_c;
+                    mean_rvec.at<cv::Vec3d>(frame_index) = rvec_c;
+                    cv::reduce(mean_tvec, tvec_m, 0, cv::REDUCE_AVG, CV_64F);
+                    cv::reduce(mean_rvec, rvec_m, 0, cv::REDUCE_AVG, CV_64F);
+                    frame_index = (frame_index+1) % FRAMES;
+                    this->cameraExtrinsicMatrixGL = cvVec2glmMat(rvec_m.at<cv::Vec3d>(0), tvec_m.at<cv::Vec3d>(0));
                 }
 
             }

@@ -92,6 +92,8 @@ bool debugMode = false;
 char* pi_credentials;
 string pathToCameraParameters;
 double far=100, near=0.1;
+float scale_factor = 1;
+string modelPath;
 char autoScaleAxis = 'n';
 string iphost = "\0";
 int cameraIndex = 0;
@@ -122,9 +124,9 @@ int main(int argc, char** argv)
     try{
         c.openComunicators(
             cameraIndex,
-            "appsrc is-live=true ! queue ! videoscale ! video/x-raw, width={width}, height={height} ! videoconvert ! video/x-raw, format=I420 ! queue ! vaapih264enc quality-level=7 keyframe-period=20 ! video/x-h264, stream-format=avc, profile=baseline ! queue ! rtph264pay config-interval=1 ! udpsink host={ip} port=5000 sync=false",
+            "appsrc is-live=true ! queue ! videoscale ! video/x-raw, width={width}, height={height} ! videoconvert ! video/x-raw, format=I420 ! queue ! vaapih264enc quality-level=7 keyframe-period=20 ! video/x-h264, stream-format=avc, profile=baseline ! queue ! rtph264pay config-interval=1 ! udpsink host={ip} port=5000",
             pi_credentials == NULL ? string() : pi_credentials,
-            "udpsrc port=5000 ! application/x-rtp, media=video, clock-rate=90000, encoding-name=H264, payload=96, a-framerate=20 ! rtpjitterbuffer drop-on-latency=true ! rtph264depay ! queue ! decodebin ! videoconvert ! queue ! appsink"
+            "udpsrc port=5000 ! application/x-rtp, media=video, clock-rate=90000, encoding-name=H264, payload=96, a-framerate=20 ! rtpjitterbuffer drop-on-latency=true latency=100 ! rtph264depay ! queue ! decodebin ! videoconvert ! queue ! appsink"
         );
     }
     catch(...){
@@ -135,6 +137,7 @@ int main(int argc, char** argv)
     
     GLFWwindow* window = initializeProgram((GLuint)c.getHalfScreenWidth(), (GLuint)c.getHalfScreenHeight());  
 
+    //Gera polígono em que será aplicado o background (imagem capturada pela câmera)
     unsigned int VAO, VBO, EBO;
     glGenVertexArrays(1, &VAO);
     glBindVertexArray(VAO);
@@ -166,7 +169,7 @@ int main(int argc, char** argv)
     Shader background_shader("./background_shader.vs", "./background_shader.fs");
 
     // Load model
-    Model ourModel("./resources/objects/column/column.obj");    
+    Model ourModel(modelPath);    
 
     //Obtendo matrix de projeção
     cd.resizeCameraMatrix(c.getFrameWidth(), c.getFrameHeight());
@@ -175,7 +178,7 @@ int main(int argc, char** argv)
         c.getHalfScreenHeight(), near, far);
 
     //Inicializando/Aplicando distorção
-    double coeff_dist[4] = {1, 2, 0, 1.0};
+    double coeff_dist[4] = {1, 2, 0, 0};
     Mat pontos_dist, coefficients(1, 4, CV_64FC1, coeff_dist);    
     pontos_dist = initializeBarrelDistortionParameters(
         c.getFrameWidth(), c.getFrameHeight(), cd.getCameraMatrix(),
@@ -190,9 +193,9 @@ int main(int argc, char** argv)
     glm::vec3 scale(0.0f);
     glm::mat4 model(1.0f);
     glm::vec3 trans(1.0f);
-    glm::vec4 lightPos(10.0f);
+    glm::vec4 lightPos(0.0f, 0.0f, 50.0f, 1.0f);
     
-    double mean=0;
+    int fps=0;
     unsigned long int frames = 0;
     long int frames_times[5] = {0};
     char fps_text[50] = {'0'};
@@ -247,10 +250,10 @@ int main(int argc, char** argv)
         ourShader.setMat4("projection", projection);
         ourShader.setMat4("view", viewMatrix);
         ourShader.setMat4("model", model);
-        ourShader.setVec3("viewPos", 0, 0, 0);
-        //Impede da iluminação se movimentar junto com o objeto (mantem fixa)
-        glm::vec4 lightPosTemp = glm::inverse(model) * lightPos;
-        ourShader.setVec3("lightPos", lightPosTemp[0], lightPosTemp[1], lightPosTemp[2]);
+        glm::vec3 camera_position = -glm::transpose(glm::mat3(viewMatrix))*glm::vec3(viewMatrix[3]);
+        ourShader.setVec3("camera_position", camera_position);
+        ourShader.setFloat("scale_factor", scale_factor);
+        ourShader.setVec3("lightPos", lightPos[0], lightPos[1], lightPos[2]);
         ourModel.Draw(ourShader);
 
         glDisable(GL_DEPTH_TEST);
@@ -269,21 +272,17 @@ int main(int argc, char** argv)
 	    //Draw avg and "momentaneous" (last 5) framerate
 	    if(debugMode){
 	        frames++;	   
-            before = end;
-            end = chrono::steady_clock::now();           
-	        frames_times[(frames-1)%5] = chrono::duration_cast<std::chrono::milliseconds>(end-before).count();
-            
-            mean = 0;
-            for(int i = 0; i < 5; i++){
-                mean+=(double)frames_times[i];
+            end = chrono::steady_clock::now();  
+
+            if(chrono::duration_cast<std::chrono::milliseconds>(end-before).count() > 1000){
+                before = end;
+                fps = frames;
+                frames = 0;
             }
-            mean = 5000.0/mean;
             
-            sprintf (fps_text, "avg fps: %f, fps: %f", 
-                (frames*1000.0)/chrono::duration_cast<std::chrono::milliseconds>(end - begin).count(),
-                mean);
+            sprintf (fps_text, "fps: %i", fps);
             putText(output, fps_text, Point(30,30), 
-                FONT_HERSHEY_COMPLEX_SMALL, 0.5, Scalar(200,200,250), 1);
+                FONT_HERSHEY_COMPLEX_SMALL, 0.5, Scalar(0,250,0), 1);
         }	    
 	        
         c.writeImage(output);
@@ -345,10 +344,10 @@ GLFWwindow* initializeProgram(GLuint width, GLuint height){
 }
 
 void processArgs(int argc, char** argv){
-    int n_obg = 3;
-    char obg[][10] = {"-pi\0", "-c\0", "-iphost\0"};
+    int n_obg = 4;
+    char obg[][10] = {"-pi\0", "-cc\0", "-iphost\0", "-m\0"};
     //Informa se é obrigatório mesmo com o modo debug ativado
-    bool mode_d[] = {false, true, false};
+    bool mode_d[] = {false, true, false, true};
 
     for(int i = 1; i < argc; i++){
         if(strcmp(argv[i], "-d") == 0){
@@ -372,19 +371,25 @@ void processArgs(int argc, char** argv){
         else if(strcmp(argv[i], "-c")==0 && argc > i+1){
             cameraIndex = argv[i+1][0]-'0';
             i++;
-        }      
+        }   
         else if(strcmp(argv[i], "-iphost")==0 && argc > i+1){
             iphost = string(argv[i+1]);
             memset(obg[2], '\0', 10);
             i++;
+        }   
+        else if(strcmp(argv[i], "-m")==0 && argc > i+1){
+            modelPath = string(argv[i+1]);
+            memset(obg[3], '\0', 10);
+            i++;
         }
         else{
             cout << "Command " << argv[i] << "invalid" << endl;
-            cout << "Minimum usage: ./oficial.out -d -c <path to camera parameters>" << endl
+            cout << "Minimal usage: ./oficial.out -d -c <path to camera parameters> -m <path to model>" << endl
                  << "Options:" << endl 
                  << "-a : [Optional] Informs the autoscale axis. Case not informed, autoscale is going to be disabled" << endl 
                  << "-d : [Optional] Debug mode" << endl
                  << "-c : [Optional] Informs index of local camera (-d) or pi camera (-pi). Default: 0" << endl 
+                 << "-m : [Required] Model Path" << endl
                  << "-cc : [Required] Informs the path of camera calibration file" << endl
                  << "-pi: [Required if -d not passed] Informs user@ip of raspberry" << endl
                  << "-iphost: [Required if -d not passed] Informs ip of computer host" << endl;
@@ -437,36 +442,28 @@ void processInputCV(char key, float& step, glm::mat4& model){
     int sentido = 1, angle = 0;
     switch(key){
         case 'w':
-            //Como a inversão inverte também o movimento, ele deve ser feito no sentido contrário
-            //ao desejado
-            model = glm::translate(glm::inverse(model), glm::vec3(0.0f, -step, 0.0f));
-            model = glm::inverse(model);
+            model = model * glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, step, 0.0f));
             break;
         case 's':
-            model = glm::translate(glm::inverse(model), glm::vec3(0.0f, step, 0.0f));
-            model = glm::inverse(model);
+            model = model * glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -step, 0.0f));
             break;
         case 'd':
-            model = glm::translate(glm::inverse(model), glm::vec3(-step, 0.0f, 0.0f));
-            model = glm::inverse(model);
+            model = model * glm::translate(glm::mat4(1.0f), glm::vec3(step, 0.0f, 0.0f));
             break;
         case 'a':
-            model = glm::translate(glm::inverse(model), glm::vec3(step, 0.0f, 0.0f));
-            model = glm::inverse(model);
+            model = model * glm::translate(glm::mat4(1.0f), glm::vec3(-step, 0.0f, 0.0f));
             break;
         case 'q':
-            model = glm::translate(glm::inverse(model), glm::vec3(0.0f, 0.0f, -step));
-            model = glm::inverse(model);
+            model = model * glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, step));
             break;
         case 'e':
-            model = glm::translate(glm::inverse(model), glm::vec3(0.0f, 0.0f, step));
-            model = glm::inverse(model);
+            model = model * glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -step));
             break;
         case 'Z':
-            model = glm::scale(model, glm::vec3(2.0f, 2.0f, 2.0f));
+            scale_factor *= 2.0;
             break;
         case 'z':
-            model = glm::scale(model, glm::vec3(0.5f, 0.5f, 0.5f));
+            scale_factor *= 0.5;
             break;
         case 'i':
             sentido = -1;

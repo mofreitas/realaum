@@ -321,7 +321,7 @@ public:
         this->framerate = framerate;
 
         if(!this->debugMode && !pi_ssh_login.empty()){
-            std::string device_pipe = "ssh {pi_ssh_login} -t 'gst-launch-1.0 -vvv v4l2src device=/dev/video{cameraIndex} ! videoconvert ! video/x-raw, width={width}, height={height} ! videorate ! video/x-raw, framerate={framerate}/1 ! queue ! omxh264enc ! queue ! rtph264pay config-interval=1 ! queue ! udpsink port=5000 host={host}' > ./output_gst.txt";
+            std::string device_pipe = "ssh {pi_ssh_login} -t 'gst-launch-1.0 -vvv v4l2src device=/dev/video{cameraIndex} ! video/x-raw, width={width}, height={height} ! videorate ! video/x-raw, framerate={framerate}/1 ! videoconvert ! queue ! omxh264enc ! queue ! rtph264pay config-interval=1 ! queue ! udpsink port=5000 host={host}' > ./output_gst.txt";
             insertParameters({"{framerate}", "{ip}", "{pi_ssh_login}", "{width}", "{height}", "{host}", "{cameraIndex}"}, 
                             {std::to_string(framerate), this->device_ip, pi_ssh_login, std::to_string(camera.width), std::to_string(camera.height), this->host_ip, std::to_string(cameraIndex)},
                             device_pipe);
@@ -351,8 +351,8 @@ public:
 
         //Abrindo pipe de saída
         if(!this->debugMode){
-            insertParameters({"{width}", "{height}", "{ip}"}, 
-                             {std::to_string(this->screen.width), std::to_string(this->screen.height), this->device_ip},
+            insertParameters({"{ip}"}, 
+                             {this->device_ip},
                              out_pipe);           
 
             std:: cout << "outpipe: " << out_pipe << std::endl;
@@ -411,7 +411,7 @@ public:
      * Obtem imagem da fila de leitura. Caso a fila esteja vazia, retorna a imagem anterior
      */
     cv::Mat readImage(){
-        std::lock_guard<std::mutex> lock(inputMutex);          
+        std::lock_guard<std::mutex> lock(inputMutex);  
         return this->inFrame.clone();
     }
 
