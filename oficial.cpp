@@ -92,7 +92,7 @@ bool debugMode = false;
 char* pi_credentials;
 string pathToCameraParameters;
 double far=100, near=0.1;
-float scale_factor = 1;
+glm::mat4 scale_matrix = glm::mat4(1.0f);
 string modelPath;
 char autoScaleAxis = 'n';
 string iphost = "\0";
@@ -250,9 +250,9 @@ int main(int argc, char** argv)
         ourShader.setMat4("projection", projection);
         ourShader.setMat4("view", viewMatrix);
         ourShader.setMat4("model", model);
+        ourShader.setMat4("scale_matrix", scale_matrix);
         glm::vec3 camera_position = -glm::transpose(glm::mat3(viewMatrix))*glm::vec3(viewMatrix[3]);
         ourShader.setVec3("camera_position", camera_position);
-        ourShader.setFloat("scale_factor", scale_factor);
         ourShader.setVec3("lightPos", lightPos[0], lightPos[1], lightPos[2]);
         ourModel.Draw(ourShader);
 
@@ -460,10 +460,10 @@ void processInputCV(char key, float& step, glm::mat4& model){
             model = model * glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -step));
             break;
         case 'Z':
-            scale_factor *= 2.0;
+            scale_matrix = glm::scale(scale_matrix, glm::vec3(2.0f, 2.0f, 2.0f));
             break;
         case 'z':
-            scale_factor *= 0.5;
+            scale_matrix = glm::scale(scale_matrix, glm::vec3(0.5f, 0.5f, 0.5f));
             break;
         case 'i':
             sentido = -1;

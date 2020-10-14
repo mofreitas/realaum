@@ -194,9 +194,24 @@ private:
         // 4. height maps
         //std::vector<Texture> heightMaps = loadMaterialTextures(material, aiTextureType_AMBIENT, "texture_height");
         //textures.insert(textures.end(), heightMaps.begin(), heightMaps.end());
-        
+
+        //Set colors
+        Color colors = loadMaterialColors(material);
+        for(int i = 0; i < vertices.size(); i++){
+            vertices.at(i).Colors = colors;
+        }
+
         // return a mesh object created from the extracted mesh data
         return Mesh(vertices, indices, textures);
+    }
+
+    Color loadMaterialColors(aiMaterial *mat){
+        Color color;
+        mat->Get(AI_MATKEY_COLOR_AMBIENT, color.ambient);
+        mat->Get(AI_MATKEY_COLOR_DIFFUSE, color.diffuse);
+        mat->Get(AI_MATKEY_COLOR_SPECULAR, color.specular);
+        mat->Get(AI_MATKEY_SHININESS, color.ns);
+        return color;
     }
 
     // checks all material textures of a given type and loads the textures if they're not loaded yet.

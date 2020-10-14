@@ -15,6 +15,13 @@
 #include <vector>
 using namespace std;
 
+struct Color {
+    aiColor3D ambient;
+    aiColor3D diffuse;
+    aiColor3D specular;
+    float ns;
+};
+
 struct Vertex {
     // position
     glm::vec3 Position;
@@ -22,6 +29,8 @@ struct Vertex {
     glm::vec3 Normal;
     // texCoords
     glm::vec2 TexCoords;
+    //vertex colors
+    Color Colors;
     // tangent
     //glm::vec3 Tangent;
     // bitangent
@@ -33,6 +42,7 @@ struct Texture {
     string type;
     string path;
 };
+
 
 class Mesh {
 public:
@@ -126,6 +136,18 @@ private:
         // vertex texture coords
         glEnableVertexAttribArray(2);	
         glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, TexCoords));
+        // vertex color ambient
+        glEnableVertexAttribArray(3);	
+        glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, Colors.ambient));
+        // vertex color diffuse
+        glEnableVertexAttribArray(4);	
+        glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, Colors.diffuse));
+        // vertex texture specular
+        glEnableVertexAttribArray(5);	
+        glVertexAttribPointer(5, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, Colors.specular));
+        // shininess
+        glEnableVertexAttribArray(6);	
+        glVertexAttribPointer(6, 1, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, Colors.ns));
         // vertex tangent
         //glEnableVertexAttribArray(3);
         //glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, Tangent));
