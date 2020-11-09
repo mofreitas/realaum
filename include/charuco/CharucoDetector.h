@@ -16,7 +16,6 @@ private:
     cv::Ptr<cv::aruco::Dictionary> dictionary;
     cv::Ptr<cv::aruco::CharucoBoard> board;
     cv::Mat cameraMatrix, distCoeffs;
-    cv::Size_<float> charucoBoardObjSize;
 
     glm::mat4 cameraExtrinsicMatrixGL;
     glm::mat4 GL2CVMatrix;
@@ -169,6 +168,14 @@ public:
         return this->cameraHeight;
     }
 
+    float getBoardWidth(){
+        return this->board->getChessboardSize().width * this->board->getSquareLength();
+    }  
+
+    float getBoardHeight(){
+        return this->board->getChessboardSize().height * this->board->getSquareLength();
+    }
+
     cv::Mat getCameraMatrix(){
         return this->cameraMatrix;
     }
@@ -185,64 +192,37 @@ public:
      * Função utilizada para redimensionar objeto
      * 
      * @param size_object Vetor contendo os tamanhos nos eixos x, y e z do modelo (objeto)
-     * @param image Imagem utilizada para medir o tamanho do tabuleiro
      * @param axis Eixo indicando qual deve ser o novo tamanho do objeto. Por exemplo, se axis = x,
-     * o tamanho sobre o eixo x do objeto será igual ao tamanho do tabuleiro sobe esse mesmo eixo.
+     * o tamanho sobre o eixo x do objeto será igual ao tamanho do tabuleiro sobe esse mesmo eixo. 
+     * Caso o eixo 'z' seja escolhido, seu tamanho nesse eixo será igual ao comprimento do tabuleiro.
      * 
-     * @returns Vetor de escala do objeto
+     * @returns Fator de escala do objeto
      */
-    glm::vec3 getAutoScaleVector(const glm::vec3 size_object, const cv::Mat image, char axis = 'x'){
+    float getAutoScaleVector(const glm::vec3 size_object, char axis = 'x'){
         
         int squares_w = this->board->getChessboardSize().width;
         int squares_h = this->board->getChessboardSize().height;
         float sq_size = this->board->getSquareLength();
 
-        glm::vec3 scale(1.0f);
-        glm::mat4 viewMatrix(0.0f);
-        cv::Vec3f p1, p2;
-        std::vector<cv::Point2f> imagePoints;
-        std::vector<cv::Point3f> objectPoints_topright;
-        objectPoints_topright.reserve(4);
-
-        //Recalcula coordenadas cantos tabuleiro de forma que o centro do eixo de coordenadas fique em
-        //cima do canto superior direito do tabuleiro. A ordem de inserção deve ser igual a de objectPoints    
-        objectPoints_topright.push_back(cv::Point3f(0                 , 0                 , 0));
-        objectPoints_topright.push_back(cv::Point3f(0                 , -sq_size*squares_h, 0));
-        objectPoints_topright.push_back(cv::Point3f(-sq_size*squares_w, -sq_size*squares_h, 0));
-        objectPoints_topright.push_back(cv::Point3f(-sq_size*squares_w, 0                 , 0));
-
-        viewMatrix = getViewMatrix(image);
-        //Enquanto a viewMatrix for 0 (valor padrão), isso indica que tabuleiro não foi achado
-        if (viewMatrix[0][0] == 0.0f)
-            return glm::vec3(0.0f, 0.0f,0.0f);
-
-        cv::Vec3f rvec, tvec;
-        std::cout << viewMatrix[0][0] << std::endl;
-        getRvecTvecFromViewMatrix(viewMatrix, rvec, tvec);
-
-        cv::projectPoints(this->objectPoints, rvec, tvec, this->cameraMatrix, this->distCoeffs, imagePoints);
-        cv::solvePnP(this->objectPoints, imagePoints, this->cameraMatrix, this->distCoeffs, rvec, p1);
-        cv::solvePnP(objectPoints_topright, imagePoints, this->cameraMatrix, this->distCoeffs, rvec, p2);
-
-        double size_x = cv::norm(p1, p2, cv::NORM_L2, cv::Vec3b(255, 0, 0));
-        double size_y = cv::norm(p1, p2, cv::NORM_L2, cv::Vec3b(0, 255, 0));
+        float scale = 0.0;
+       
+        double size_x = squares_w*sq_size;
+        double size_y = squares_h*sq_size;
 
         if (axis == 'x'){
-            scale = scale * ((float)size_x / size_object[0]);
+            scale = (float)size_x / size_object[0];
         }
         else if (axis == 'y'){
-            scale = scale * ((float)size_y / size_object[1]);
+            scale = (float)size_y / size_object[1];
         }
         else if (axis == 'z'){
-            scale = scale * ((float)tvec[2] / size_object[2]);
+            scale = (float)size_y / size_object[2];
         }
-
-        this->charucoBoardObjSize = cv::Size_<float>((float)size_x, (float)size_y);
 
         //Condição feita apenas no final da função (em vez de no começo) para que 
         //charucoBoardObjSize possa ser preenchido.
         if(axis != 'x' && axis != 'y' && axis != 'z')
-            return glm::vec3(1.0f, 1.0f, 1.0f);
+            return 1.0;
         return scale;
     }    
 
@@ -269,10 +249,6 @@ public:
             this->cameraMatrix.at<double>(0, 2) = (double) this->cameraMatrix.at<double>(0, 2)*newWidth/this->cameraWidth;
             this->cameraMatrix.at<double>(1, 2) = (double) this->cameraMatrix.at<double>(1, 2)*newHeight/this->cameraHeight;
         }
-    }
-
-    cv::Size_<float> getCharucoBoardObjSize(){
-        return this->charucoBoardObjSize;
     }
 
     cv::Mat getDistCoeffs(){

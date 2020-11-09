@@ -198,7 +198,7 @@ int main(int argc, char *argv[]) {
         inputVideo.open(video);
         waitTime = 0;
     } else {
-        inputVideo.open("v4l2src device=/dev/video0 ! videoscale ! video/x-raw, width=1280, height=720 ! videoconvert ! queue ! appsink", CAP_GSTREAMER);
+        inputVideo.open("v4l2src device=/dev/video0 ! videoscale ! video/x-raw, width=640 ! videoconvert ! queue ! appsink", CAP_GSTREAMER);
         //inputVideo.set(cv::CAP_PROP_FRAME_WIDTH, 640);
         //inputVideo.set(cv::CAP_PROP_FRAME_HEIGHT, 480);
         waitTime = 10;

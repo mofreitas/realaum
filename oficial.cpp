@@ -189,11 +189,12 @@ int main(int argc, char** argv)
     Mat image_read, image_write(c.getHalfScreenHeight(), c.getHalfScreenWidth(), CV_8UC3);
     Mat image_barrel, output(c.getScreenHeight(), c.getScreenWidth(), CV_8UC3); 
 
-    float step = 0.0;
-    glm::vec3 scale(0.0f);
+    float scale = cd.getAutoScaleVector(ourModel.getSize(), autoScaleAxis);
+    float step = cd.getBoardWidth() * 0.1;
+    cout << "step: " << step << endl;
     glm::mat4 model(1.0f);
-    glm::vec3 trans(1.0f);
     glm::vec4 lightPos(0.0f, 0.0f, 50.0f, 1.0f);
+    scale_matrix = glm::scale(glm::mat4(1.0f), glm::vec3(scale));
     
     int fps=0;
     unsigned long int frames = 0;
@@ -239,13 +240,6 @@ int main(int argc, char** argv)
 
         glEnable(GL_DEPTH_TEST);
 
-        //Apenas faz a auto escala quando encontra o tabuleiro charuco pela primeira vez
-        if(scale[0] == 0.0f){
-            scale = cd.getAutoScaleVector(ourModel.getSize(), image_read, autoScaleAxis);
-            step = cd.getCharucoBoardObjSize().width * 0.1;
-            model = glm::scale(glm::mat4(1.0f), scale);
-        }
-       
         ourShader.use();
         ourShader.setMat4("projection", projection);
         ourShader.setMat4("view", viewMatrix);
