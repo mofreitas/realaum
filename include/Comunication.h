@@ -333,7 +333,7 @@ public:
 
         //Abrindo pipe de entrada
         if(pi_ssh_login.empty() || in_pipe.empty() || this->debugMode){
-            in_pipe = "v4l2src device=/dev/video{cameraIndex} ! videoscale ! video/x-raw, width=640 ! videorate max-rate={framerate} ! videoconvert ! queue ! appsink";
+            in_pipe = "v4l2src device=/dev/video{cameraIndex} ! queue ! videoscale ! video/x-raw, width=640 ! videorate max-rate={framerate} ! videoconvert ! appsink";
         }
 
         insertParameters({"{framerate}", "{cameraIndex}"}, 

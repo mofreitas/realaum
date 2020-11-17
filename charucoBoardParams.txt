@@ -1,0 +1,8 @@
+%YAML:1.0
+---
+generation_time: "Mon Nov 16 19:16:21 2020"
+dictionary_id: 4
+marker_length: 50.
+square_length: 70.
+squares_x: 5
+squares_y: 7

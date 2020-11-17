@@ -28,7 +28,7 @@ int main(){
     // camera parameters are read from somewhere
     readCameraParameters("./saida.txt", cameraMatrix, distCoeffs);
     cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_5X5_50);
-    cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 7, 0.05, 0.03, dictionary);
+    cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 7, 70, 50, dictionary);
     while (inputVideo.grab()) {
         cv::Mat image, imageCopy;
         inputVideo.retrieve(image);
@@ -48,7 +48,7 @@ int main(){
                 bool valid = cv::aruco::estimatePoseCharucoBoard(charucoCorners, charucoIds, board, cameraMatrix, distCoeffs, rvec, tvec);
                 // if charuco pose is valid
                 if(valid){
-                    cv::aruco::drawAxis(imageCopy, cameraMatrix, distCoeffs, rvec, tvec, 0.1);
+                    cv::drawFrameAxes(imageCopy, cameraMatrix, distCoeffs, rvec, tvec, board->getSquareLength());
                     cout << rvec << ", " << tvec << endl;
                 }
 

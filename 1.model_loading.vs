@@ -15,8 +15,8 @@ out vec3 kd;
 out vec3 ks;
 out float ns;
 
-uniform mat4 scale_matrix;
-uniform mat4 model;
+uniform mat4 scalematrix;
+uniform mat4 transrot;
 uniform mat4 view;
 uniform mat4 projection;
 
@@ -29,7 +29,7 @@ void main()
     ks = color_spec;
     ns = shininess;
 
-    FragPos =  vec3(model * scale_matrix * vec4(aPos, 1.0));
-    normal_vec = mat3(model) * aNormal;
+    FragPos =  vec3(transrot * scalematrix * vec4(aPos, 1.0));
+    normal_vec = mat3(transrot) * aNormal;
     gl_Position = projection * view * vec4(FragPos, 1.0);
 }

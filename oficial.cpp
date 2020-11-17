@@ -62,11 +62,12 @@ Mat cvMat2TexInput(Mat &img);
  * @param width Largura da imagem a distorcer
  * @param height Altura da imagem a distorcer
  * @param cameraMatrix Matriz da câmera da imagem a distorcer
- * @param distCoefficients Coeficientes de distorção desejado na imagem de saída
+ * @param distCoefficients Coeficientes de distorção da imagem a distorcer
+ * @param newDistCoefficients Coeficientes de distorção desejado na imagem de saída
  * 
  * @return Matriz que mapeia a disposição dos pontos da imagem a ser distorcida
  */
-Mat initializeBarrelDistortionParameters(int width, int height, Mat cameraMatrix, Mat distCoefficients);
+Mat initializeBarrelDistortionParameters(int width, int height, Mat cameraMatrix, Mat distCoefficients, Mat newDistCoefficients);
 
 /**
  * Gera a matrix de projeção da trasnformação de coordenadas
@@ -91,7 +92,8 @@ void applyBarrelDistortion(Mat& img, Mat& pontos_dist);
 bool debugMode = false;
 char* pi_credentials;
 string pathToCameraParameters;
-double far=100, near=0.1;
+string pathToBoardParameters;
+double far=100, near=0.1; //São alterados abaixo
 glm::mat4 scale_matrix = glm::mat4(1.0f);
 string modelPath;
 char autoScaleAxis = 'n';
@@ -116,7 +118,7 @@ int main(int argc, char** argv)
     processArgs(argc, argv);
 
     //Read camera intrisics
-    CharucoDetector cd(pathToCameraParameters, debugMode);
+    CharucoDetector cd(pathToCameraParameters, pathToBoardParameters, debugMode);
 
     //Create/Open/Start Communication
     Comunication c(iphost, 40001, debugMode, cd.getCameraWidth(), cd.getCameraHeight());
@@ -171,7 +173,9 @@ int main(int argc, char** argv)
     // Load model
     Model ourModel(modelPath);    
 
-    //Obtendo matrix de projeção
+    //Obtendo matrix de projeção. Valores obtidos experimentalmente
+    far = cd.getBoardHeight()*10; near = cd.getSquareLength()*2;
+    cout << "near: " << near << ", far: " << far << endl;
     cd.resizeCameraMatrix(c.getFrameWidth(), c.getFrameHeight());
     glm::mat4 projection = getProjetionMatrix(
         cd.getCameraMatrix(), c.getHalfScreenWidth(),
@@ -182,7 +186,7 @@ int main(int argc, char** argv)
     Mat pontos_dist, coefficients(1, 4, CV_64FC1, coeff_dist);    
     pontos_dist = initializeBarrelDistortionParameters(
         c.getFrameWidth(), c.getFrameHeight(), cd.getCameraMatrix(),
-        coefficients);
+        cd.getDistCoeffs4(), coefficients);
 
     // Auxiliary variables
     Mat image_data;
@@ -193,7 +197,7 @@ int main(int argc, char** argv)
     float step = cd.getBoardWidth() * 0.1;
     cout << "step: " << step << endl;
     glm::mat4 model(1.0f);
-    glm::vec4 lightPos(0.0f, 0.0f, 50.0f, 1.0f);
+    glm::vec4 lightPos(0.0f, 0.0f, cd.getBoardHeight()*5, 1.0f); //Valor obtidos experimentalmente
     scale_matrix = glm::scale(glm::mat4(1.0f), glm::vec3(scale));
     
     int fps=0;
@@ -208,6 +212,7 @@ int main(int argc, char** argv)
     while (!glfwWindowShouldClose(window))
     {
         // Render background
+        //glClearDepth(0.0);
         glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -219,7 +224,8 @@ int main(int argc, char** argv)
 
         image_read = c.readImage();
 
-        //getting viewing matrix from charuco
+        //Obtendo matriz de visualização. Mantém aqui para que a imagem
+        //com as informações debug sejam apresentadas por meio do OpenGL
         glm::mat4 viewMatrix = cd.getViewMatrix(image_read);
 
         image_data = cvMat2TexInput(image_read);  
@@ -243,8 +249,8 @@ int main(int argc, char** argv)
         ourShader.use();
         ourShader.setMat4("projection", projection);
         ourShader.setMat4("view", viewMatrix);
-        ourShader.setMat4("model", model);
-        ourShader.setMat4("scale_matrix", scale_matrix);
+        ourShader.setMat4("transrot", model);
+        ourShader.setMat4("scalematrix", scale_matrix);
         glm::vec3 camera_position = -glm::transpose(glm::mat3(viewMatrix))*glm::vec3(viewMatrix[3]);
         ourShader.setVec3("camera_position", camera_position);
         ourShader.setVec3("lightPos", lightPos[0], lightPos[1], lightPos[2]);
@@ -338,10 +344,10 @@ GLFWwindow* initializeProgram(GLuint width, GLuint height){
 }
 
 void processArgs(int argc, char** argv){
-    int n_obg = 4;
-    char obg[][10] = {"-pi\0", "-cc\0", "-iphost\0", "-m\0"};
+    int n_obg = 5;
+    char obg[][10] = {"-pi\0", "-cp\0", "-iphost\0", "-m\0", "-bp\0"};
     //Informa se é obrigatório mesmo com o modo debug ativado
-    bool mode_d[] = {false, true, false, true};
+    bool mode_d[] = {false, true, false, true, true};
 
     for(int i = 1; i < argc; i++){
         if(strcmp(argv[i], "-d") == 0){
@@ -353,7 +359,7 @@ void processArgs(int argc, char** argv){
             memset(obg[0], '\0', 10);
             i++;
         }
-        else if(strcmp(argv[i], "-cc")==0 && argc > i+1){
+        else if(strcmp(argv[i], "-cp")==0 && argc > i+1){
             pathToCameraParameters = string(argv[i+1]);
             memset(obg[1], '\0', 10);
             i++;
@@ -376,15 +382,21 @@ void processArgs(int argc, char** argv){
             memset(obg[3], '\0', 10);
             i++;
         }
+        else if(strcmp(argv[i], "-bp")==0 && argc > i+1){
+            pathToBoardParameters = string(argv[i+1]);
+            memset(obg[4], '\0', 10);
+            i++;
+        }
         else{
-            cout << "Command " << argv[i] << "invalid" << endl;
-            cout << "Minimal usage: ./oficial.out -d -c <path to camera parameters> -m <path to model>" << endl
+            cout << "Command " << argv[i] << " is invalid" << endl;
+            cout << "Minimal usage: ./oficial.out -d -cp <path to camera parameters> -m <path to model> -bp <path to board parameters>" << endl
                  << "Options:" << endl 
                  << "-a : [Optional] Informs the autoscale axis. Case not informed, autoscale is going to be disabled" << endl 
                  << "-d : [Optional] Debug mode" << endl
                  << "-c : [Optional] Informs index of local camera (-d) or pi camera (-pi). Default: 0" << endl 
                  << "-m : [Required] Model Path" << endl
-                 << "-cc : [Required] Informs the path of camera calibration file" << endl
+                 << "-bp : [Required] Path of board parameters" << endl
+                 << "-cp : [Required] Path of camera calibration file" << endl
                  << "-pi: [Required if -d not passed] Informs user@ip of raspberry" << endl
                  << "-iphost: [Required if -d not passed] Informs ip of computer host" << endl;
             exit(-1);
@@ -399,23 +411,27 @@ void processArgs(int argc, char** argv){
     }
 }
 
-Mat initializeBarrelDistortionParameters(int width, int height, Mat cameraMatrix, Mat distCoefficients){
+Mat initializeBarrelDistortionParameters(int width, int height, Mat cameraMatrix, Mat distCoefficients, Mat newDistCoefficients){
     assert(distCoefficients.cols == 4 && distCoefficients.rows == 1);
-
-    Mat pontos(height, width, CV_32FC2), pontos_dist = Mat(height, width, CV_32FC2);
-    Matx33d camMat = cameraMatrix; 
-    Matx33d camMat_inv = camMat.inv(); 
+    
+    Mat pontos_undist(height, width, CV_32FC2), 
+        pontos_dist = Mat(height, width, CV_32FC2), 
+        pontos = Mat(height, width, CV_32FC2);
 
     for(int i = 0; i < height; i++){
         for(int j = 0; j < width; j++){
-            Vec3f v(j, i, 1.0);
-            Vec3f r = camMat_inv * v;
-            pontos.at<Vec2f>(i, j)[0] = r[0];
-            pontos.at<Vec2f>(i, j)[1] = r[1];
+            pontos.at<Vec2f>(i, j)[0] = j;
+            pontos.at<Vec2f>(i, j)[1] = i;
         }
     }
+    
+    //Recebe pontos não normalizados e retorna normalizados se P não for definido
+    //https://docs.opencv.org/3.4/da/d54/group__imgproc__transform.html#ga55c716492470bfe86b0ee9bf3a1f0f7e
+    fisheye::undistortPoints(pontos, pontos_undist, cameraMatrix, distCoefficients);
 
-    fisheye::distortPoints(pontos, pontos_dist, camMat, distCoefficients);
+    //Recebe pontos normalizados (matriz intríseca identidade) e retorna pontos não normalizados
+    //https://docs.opencv.org/master/db/d58/group__calib3d__fisheye.html#ga75d8877a98e38d0b29b6892c5f8d7765
+    fisheye::distortPoints(pontos_undist, pontos_dist, cameraMatrix, newDistCoefficients);
     return pontos_dist;
 }
 
@@ -425,10 +441,10 @@ void applyBarrelDistortion(Mat& img, Mat& pontos_dist){
 
 glm::mat4 getProjetionMatrix(Mat cameraMatrix, int screenWidth, int screenHeight, double near, double far){
     return glm::mat4(
-        2.0*cameraMatrix.at<double>(0, 0)/screenWidth, 0, 0, 0,
-        0, 2.0*cameraMatrix.at<double>(1, 1)/screenHeight, 0, 0,
+        2.0*cameraMatrix.at<double>(0, 0)/screenWidth, 0.0, 0.0, 0.0,
+        0.0, 2.0*cameraMatrix.at<double>(1, 1)/screenHeight, 0.0, 0.0,
         -(1.0 - 2.0*cameraMatrix.at<double>(0, 2)/screenWidth), -(-1.0 + (2.0*cameraMatrix.at<double>(1, 2))/screenHeight), (-near-far)/(near-far), 1,  
-        0, 0, 2*near*far/(near-far), 0
+        0.0, 0.0, 2*near*far/(near-far), 0.0
     );
 }
 

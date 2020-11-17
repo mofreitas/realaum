@@ -45,6 +45,29 @@ private:
     }
 
     /**
+     * Lê os parâmetros do tabuleiro e popula o dicionário e o tabuleiro do objeto
+     * 
+     * @param filename Arquivo de texto onde parâmetros estão armaznados
+     */
+    void readBoardParametersAndCreate(std::string filename) {
+        cv::FileStorage fs(filename, cv::FileStorage::READ);
+        if(!fs.isOpened()){
+            std::cout << "Cannot open " << filename << std::endl;
+            throw 1;
+        }
+        int dictionaryId, squaresX, squaresY;
+        float marker_length, square_length;
+        fs["dictionary_id"] >> dictionaryId;
+        fs["marker_length"] >> marker_length;
+        fs["square_length"] >> square_length;
+        fs["squares_x"] >> squaresX;
+        fs["squares_y"] >> squaresY;
+
+        this->dictionary = cv::aruco::getPredefinedDictionary(dictionaryId);
+        this->board = cv::aruco::CharucoBoard::create(squaresX, squaresY, (float) square_length, (float) marker_length, this->dictionary);
+    }
+
+    /**
      * Converte o vetor de rotação e o vetor de translação para a matrix de visualização do OPENGL
      * 
      * @param rot_vec Vetor de rotação
@@ -97,7 +120,7 @@ private:
             cv::circle(image, imagePoints[1], 10, cv::Scalar(0,255,0), 3);
             cv::circle(image, imagePoints[2], 10, cv::Scalar(255,0,0), 3);
             cv::circle(image, imagePoints[3], 10, cv::Scalar(0,255,255), 3);
-            cv::drawFrameAxes(image, cameraMatrix, distCoeffs, rvec_c, tvec_c, 0.1, 3);
+            cv::drawFrameAxes(image, cameraMatrix, distCoeffs, rvec_c, tvec_c, getSquareLength(), 3);
         }        
     }
 
@@ -128,9 +151,7 @@ private:
     }
 
 public:
-    CharucoDetector(std::string calibration_filename, bool debugMode=false){
-        this->dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_5X5_50);
-        this->board = cv::aruco::CharucoBoard::create(5, 7, 0.07, 0.05, dictionary);
+    CharucoDetector(std::string calibration_filename, std::string board_filename, bool debugMode=false){
         this->debugMode = debugMode;
         this->cameraExtrinsicMatrixGL = glm::mat4(0.0f); 
         this->frame_index = 0; 
@@ -138,6 +159,8 @@ public:
         this->mean_rvec = cv::Mat(FRAMES, 1, CV_64FC3, cv::Scalar(0.0f, 0.0f, 0.0f));
         //brvec = cv::Vec3f(0.0, 0.0, 0.0); btvec= cv::Vec3f(0.0, 0.0, 0.0);
         
+        assert(!board_filename.empty());
+        readBoardParametersAndCreate(board_filename);
         int squares_w = this->board->getChessboardSize().width;
         int squares_h = this->board->getChessboardSize().height;
         float sq_size = this->board->getSquareLength();
@@ -187,7 +210,7 @@ public:
     cv::Size getChessboardSize(){
         return this->board->getChessboardSize();
     }
-
+ 
     /**
      * Função utilizada para redimensionar objeto
      * 
@@ -298,6 +321,7 @@ public:
                     cv::reduce(mean_rvec, rvec_m, 0, cv::REDUCE_AVG, CV_64F);
                     frame_index = (frame_index+1) % FRAMES;
                     this->cameraExtrinsicMatrixGL = cvVec2glmMat(rvec_m.at<cv::Vec3d>(0), tvec_m.at<cv::Vec3d>(0));
+                    std::cout << tvec_c << std::endl;
                 }
 
             }

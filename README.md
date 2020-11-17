@@ -7,7 +7,7 @@ sudo apt install libassimp-dev
 ```
 
 2. Gera tabuleiro com `/charuco/chessboardGenerator`
-3. Calibra camera com o `/charuco/calib` usando o comando `./calib "../cameraParameters.txt" -h=7 -w=5 -sl=0.07 -ml=0.05 -d=2` com:
+3. Calibra camera com o `/charuco/calib` usando o comando `./calib.out "../cameraParameters.txt" -h=7 -w=5 -sl=70 -ml=50 -d=4` com:
     1. Arquivo com os parâmetros de calibração
     2. h=número de quadros na vertical
     3. w=número de quadros na horizontal
@@ -26,7 +26,7 @@ sudo apt-get install gstreamer1.0-omx
 ```
 
 7. Compila o oficial.cpp e roda utilizando 
-    - `./oficial -d -c <caminho dos arquivo com parâmetros de calibração>` para testar usando a camera do proprio computador (sem mandar para o dispositivo móvel).
+    - `./oficial.out -cp ./cameraParametersNew.txt -d -m ./resources/objects/camaro/camaro_high.obj -bp ./charucoBoardParams.txt -a x` para testar usando a camera do proprio computador (sem mandar para o dispositivo móvel).
     - `./oficial -c <caminho dos arquivo com parâmetros de calibração>` para usar a câmera do próprio computador porém enviando para o celular as imagens finais
     - `./oficial -c <caminho dos arquivo com parâmetros de calibração> -pi <login_pi>@<ip_pi>` Para utilizar o programa com o raspberry e o dispositivo móvel.
 
