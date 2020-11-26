@@ -41,7 +41,6 @@ namespace {
 const char* about = "Create a ChArUco board image";
 const char* keys  =
         "{@outfile |<none> | Output image }"
-        "{@outfile |<none> | Output file }"
         "{w        |       | Number of squares in X direction }"
         "{h        |       | Number of squares in Y direction }"
         "{sl       |       | Square side length (in pixels) }"
@@ -55,33 +54,11 @@ const char* keys  =
         "{si       | false | show generated image }";
 }
 
-static bool saveBoardParams(string filename, int dictionaryId, Ptr<aruco::CharucoBoard> board) {
-    FileStorage fs(filename, FileStorage::WRITE);
-    if(!fs.isOpened())
-        return false;
-
-    time_t tt;
-    time(&tt);
-    struct tm *t2 = localtime(&tt);
-    char buf[1024];
-    strftime(buf, sizeof(buf) - 1, "%c", t2);
-
-    fs << "generation_time" << buf;
-
-    fs << "dictionary_id" << dictionaryId;
-    fs << "marker_length" << board->getMarkerLength();
-    fs << "square_length" << board->getSquareLength();
-    fs << "squares_x" << board->getChessboardSize().width;
-    fs << "squares_y" << board->getChessboardSize().height;
-
-    return true;
-}
-
 int main(int argc, char *argv[]) {
     CommandLineParser parser(argc, argv, keys);
     parser.about(about);
 
-    if(argc < 8) {
+    if(argc < 7) {
         parser.printMessage();
         return 0;
     }
@@ -100,7 +77,6 @@ int main(int argc, char *argv[]) {
     bool showImage = parser.get<bool>("si");
 
     String out = parser.get<String>(0);
-    String outFile = parser.get<String>(1);
 
     if(!parser.check()) {
         parser.printErrors();
@@ -127,7 +103,6 @@ int main(int argc, char *argv[]) {
     }
 
     imwrite(out, boardImage);
-    saveBoardParams(outFile, dictionaryId, board);
 
     return 0;
 }

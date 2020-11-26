@@ -42,10 +42,13 @@ private:
 
     const unsigned int ar_19_9 = 2111;  
     const unsigned int ar_18_9 = 2000;
-    const unsigned int ar_4_3 = 1333;
-    const unsigned int ar_16_9 = 1777;    
-    const unsigned int aspectRatio_heights[4] = {360, 360, 480, 360};
-    const unsigned int aspectRatio_widths[4] = {720, 640, 640, 760};
+    const unsigned int ar_16_9 = 1777; 
+       
+    const unsigned int aspectRatios[3] = {ar_19_9, ar_16_9, ar_18_9};
+    const unsigned int screen_heights[3] = {720, 720, 720};
+    const unsigned int screen_widths[3] = {1520, 1280, 1440};
+    //const unsigned int screen_heights[7] = {360, 360, 480, 360, 720, 720, 720};
+    //const unsigned int screen_widths[7] = {720, 640, 640, 760, 1280, 960, 1440};
 
     bool debugMode;
     std::atomic<bool> readDevice;
@@ -110,34 +113,41 @@ private:
      * 
      * @param ar Aspect ratio que deseja mapear 
      */
-    void setScreenSize(float ar){
+    void setScreenSize(uint32_t screen_width, uint32_t screen_height){
+        
+        unsigned int ar = screen_width*1000.0/screen_height;        
         if(ar_18_9 == ar)
         {
-            screen.width = aspectRatio_widths[0];
-            screen.height = aspectRatio_heights[0];            
+            screen.width = screen_widths[2];
+            screen.height = screen_heights[2];            
         }
         else if(ar_16_9 == ar)
         {
-            screen.width = aspectRatio_widths[1];
-            screen.height = aspectRatio_heights[1];  
-        }
-        else if(ar_4_3 == ar)
-        {
-            screen.width = aspectRatio_widths[2];
-            screen.height = aspectRatio_heights[2];  
+            screen.width = screen_widths[1];
+            screen.height = screen_heights[1];  
         }
         else if(ar_19_9 == ar)
         {
-            screen.width = aspectRatio_widths[3];
-            screen.height = aspectRatio_heights[3];  
+            screen.width = screen_widths[0];
+            screen.height = screen_heights[0];  
         }
         else
         {
-            std::cout << "Device aspect ratio not found" << std::endl;
-            screen.width = aspectRatio_widths[2];
-            screen.height = aspectRatio_heights[2];  
+            std::cout << "Device aspect ratio not found for "  << ar << std::endl;
+            int mostSimilar = 1;
+            int diffMostSimilar = 0;
+            for(int i = 0; i < 3; i++){
+                unsigned int diff = aspectRatios[i] - ar;
+                if(diff < diffMostSimilar){
+                    diffMostSimilar = diff;
+                    mostSimilar = i;
+                }
+            }
+            screen.width = screen_widths[mostSimilar];
+            screen.height = screen_heights[mostSimilar];  
         }
 
+        std::cout << "screen width: " <<  screen_width << ", screen height: " << screen_height << std::endl;
         std::cout << "Output width x height: " << screen.width 
                   << "x" << screen.height << std::endl;
     }
@@ -151,6 +161,7 @@ private:
         //Variaveis relacionadas ao socket para obter tamanho tela smartphone
         int server_sockfd, client_sockfd, opt = 1, bind_result, screen_width, screen_height;
         size_t server_len, client_len;
+        uint32_t buffer_width, buffer_height;
         struct sockaddr_in server_address;
         struct sockaddr_in client_address;
         
@@ -182,16 +193,17 @@ private:
         listen(server_sockfd, 1);
         client_len = sizeof(client_address);
         client_sockfd = accept(server_sockfd, (struct sockaddr *) &client_address, (socklen_t*) &client_len);    
-        read(client_sockfd, &screen_width, sizeof(int));   
-        read(client_sockfd, &screen_height, sizeof(int));
-        
+        read(client_sockfd, &buffer_height, sizeof(uint32_t));   
+        read(client_sockfd, &buffer_width, sizeof(uint32_t));
+        screen_width = ntohl(buffer_width);
+        screen_height = ntohl(buffer_height);
+
         this->device_ip = std::string(inet_ntoa(client_address.sin_addr));
         std::cout << this->device_ip + " connected" << std::endl;
         close(client_sockfd);    
         close(server_sockfd);
         
-        int ar = screen_width*1000.0/screen_height;
-        setScreenSize(ar); 
+        setScreenSize(screen_width, screen_height); 
     }
 
     /**
@@ -269,10 +281,9 @@ private:
     
 public:
     Comunication(std::string iphost, unsigned short port, bool debugMode = false,
-                 int cameraWidth = 640, int cameraHeight = 480){
+                 int cameraWidth = 1280, int cameraHeight = 720){
 
         this->readDevice = true;
-
         this->debugMode = debugMode;
         this->port = port;
         std::regex valid_ip("\\b(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\b");
@@ -321,7 +332,7 @@ public:
         this->framerate = framerate;
 
         if(!this->debugMode && !pi_ssh_login.empty()){
-            std::string device_pipe = "ssh {pi_ssh_login} -t 'gst-launch-1.0 -vvv v4l2src device=/dev/video{cameraIndex} ! video/x-raw, width={width}, height={height} ! videorate ! video/x-raw, framerate={framerate}/1 ! videoconvert ! queue ! omxh264enc ! queue ! rtph264pay config-interval=1 ! queue ! udpsink port=5000 host={host}' > ./output_gst.txt";
+            std::string device_pipe = "ssh {pi_ssh_login} -t 'gst-launch-1.0 -vvv v4l2src device=/dev/video{cameraIndex} ! image/jpeg, width={width}, height={height} ! videorate ! image/jpeg, framerate={framerate}/1 ! queue ! rtpjpegpay ! udpsink port=5000 host={host}' > ./output_gst.txt";
             insertParameters({"{framerate}", "{ip}", "{pi_ssh_login}", "{width}", "{height}", "{host}", "{cameraIndex}"}, 
                             {std::to_string(framerate), this->device_ip, pi_ssh_login, std::to_string(camera.width), std::to_string(camera.height), this->host_ip, std::to_string(cameraIndex)},
                             device_pipe);
@@ -333,7 +344,7 @@ public:
 
         //Abrindo pipe de entrada
         if(pi_ssh_login.empty() || in_pipe.empty() || this->debugMode){
-            in_pipe = "v4l2src device=/dev/video{cameraIndex} ! queue ! videoscale ! video/x-raw, width=640 ! videorate max-rate={framerate} ! videoconvert ! appsink";
+            in_pipe = "v4l2src device=/dev/video{cameraIndex} ! image/jpeg, width=1280 ! videorate ! image/jpeg, framerate={framerate}/1 ! queue ! vaapijpegdec ! videoconvert ! queue ! appsink";
         }
 
         insertParameters({"{framerate}", "{cameraIndex}"}, 
@@ -368,6 +379,7 @@ public:
      * Inicia threads que fazem a comunicação com dispositivos externos.
      */
     void startComunication(){
+        std::cout << "Starting Threads" << std::endl;
         this->readDevice = true;
         this->input_thread = std::thread(&Comunication::readFromDevice, this);
 

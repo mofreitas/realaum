@@ -26,9 +26,9 @@ int main(){
         inputVideo.set(cv::CAP_PROP_FRAME_HEIGHT, 480);
     cv::Mat cameraMatrix, distCoeffs;
     // camera parameters are read from somewhere
-    readCameraParameters("./saida.txt", cameraMatrix, distCoeffs);
+    readCameraParameters("../cameraParameters.txt", cameraMatrix, distCoeffs);
     cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_5X5_50);
-    cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 7, 70, 50, dictionary);
+    cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 7, 140, 100, dictionary);
     while (inputVideo.grab()) {
         cv::Mat image, imageCopy;
         inputVideo.retrieve(image);

@@ -1,6 +1,6 @@
 %YAML:1.0
 ---
-generation_time: "qui 26 nov 2020 00:05:13 -03"
+generation_time: "qua 25 nov 2020 23:17:42 -03"
 dictionary_id: 4
 marker_length: 2.4000000208616257e-02
 square_length: 3.4000001847743988e-02

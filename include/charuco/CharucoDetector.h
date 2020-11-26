@@ -12,6 +12,7 @@
 class CharucoDetector{
 private:
     const static int FRAMES = 3;
+    const static int MISSED_FRAMES = 140;
 
     cv::Ptr<cv::aruco::Dictionary> dictionary;
     cv::Ptr<cv::aruco::CharucoBoard> board;
@@ -25,6 +26,7 @@ private:
 
     cv::Mat mean_tvec, mean_rvec;
     int cameraWidth, cameraHeight, frame_index;
+    unsigned int framesMissingBoard;
     bool debugMode;
 
     /**
@@ -303,7 +305,7 @@ public:
             // if at least one charuco corner detected
             if(charucoIds.size() > 0) {
                 //Corner vectors
-                cv::Vec3d rvec, tvec;
+                cv::Vec3d rvec =  mean_rvec.at<cv::Vec3d>(frame_index), tvec = mean_tvec.at<cv::Vec3d>(frame_index);
                 //Center vectors
                 cv::Vec3d rvec_c, tvec_c;
                 cv::Mat rvec_m, tvec_m;
@@ -313,6 +315,7 @@ public:
                 bool valid = cv::aruco::estimatePoseCharucoBoard(charucoCorners, charucoIds, board, cameraMatrix, distCoeffs, rvec, tvec);
                 // if charuco pose is valid
                 if(valid){
+                    this->framesMissingBoard = 0;
                     getCenterCharucoBoard(image, rvec, tvec, rvec_c, tvec_c);
 
                     mean_tvec.at<cv::Vec3d>(frame_index) = tvec_c;
@@ -321,9 +324,13 @@ public:
                     cv::reduce(mean_rvec, rvec_m, 0, cv::REDUCE_AVG, CV_64F);
                     frame_index = (frame_index+1) % FRAMES;
                     this->cameraExtrinsicMatrixGL = cvVec2glmMat(rvec_m.at<cv::Vec3d>(0), tvec_m.at<cv::Vec3d>(0));
-                    std::cout << tvec_c << std::endl;
                 }
-
+            }
+        }
+        else{
+            this->framesMissingBoard++;
+            if(this->framesMissingBoard > MISSED_FRAMES){
+                this->cameraExtrinsicMatrixGL = glm::mat4(0);
             }
         }
         return this->cameraExtrinsicMatrixGL;

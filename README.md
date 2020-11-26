@@ -26,7 +26,7 @@ sudo apt-get install gstreamer1.0-omx
 ```
 
 7. Compila o oficial.cpp e roda utilizando 
-    - `./oficial.out -cp ./cameraParametersNew.txt -d -m ./resources/objects/camaro/camaro_high.obj -bp ./charucoBoardParams.txt -a x` para testar usando a camera do proprio computador (sem mandar para o dispositivo móvel).
+    - `./oficial.out -cp ./cameraParameters.txt -d -m ./resources/objects/camaro/camaro_high.obj -bp ./charucoBoardParams.txt -a x` para testar usando a camera do proprio computador (sem mandar para o dispositivo móvel).
     - `./oficial -c <caminho dos arquivo com parâmetros de calibração>` para usar a câmera do próprio computador porém enviando para o celular as imagens finais
     - `./oficial -c <caminho dos arquivo com parâmetros de calibração> -pi <login_pi>@<ip_pi>` Para utilizar o programa com o raspberry e o dispositivo móvel.
 

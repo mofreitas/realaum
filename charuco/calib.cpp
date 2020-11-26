@@ -59,6 +59,7 @@ const char* keys  =
         "DICT_6X6_50=8, DICT_6X6_100=9, DICT_6X6_250=10, DICT_6X6_1000=11, DICT_7X7_50=12,"
         "DICT_7X7_100=13, DICT_7X7_250=14, DICT_7X7_1000=15, DICT_ARUCO_ORIGINAL = 16}"
         "{@outfile |<none> | Output file with calibrated camera parameters }"
+        "{@outfile |<none> | Output file with Board parameters }"
         "{v        |       | Input from video file, if ommited, input comes from camera }"
         "{ci       | 0     | Camera id if input doesnt come from video (-v) }"
         "{dp       |       | File of marker detector parameters }"
@@ -98,7 +99,27 @@ static bool readDetectorParameters(string filename, Ptr<aruco::DetectorParameter
     return true;
 }
 
+static bool saveBoardParams(string filename, int dictionaryId, Ptr<aruco::CharucoBoard> board) {
+    FileStorage fs(filename, FileStorage::WRITE);
+    if(!fs.isOpened())
+        return false;
 
+    time_t tt;
+    time(&tt);
+    struct tm *t2 = localtime(&tt);
+    char buf[1024];
+    strftime(buf, sizeof(buf) - 1, "%c", t2);
+
+    fs << "generation_time" << buf;
+
+    fs << "dictionary_id" << dictionaryId;
+    fs << "marker_length" << board->getMarkerLength();
+    fs << "square_length" << board->getSquareLength();
+    fs << "squares_x" << board->getChessboardSize().width;
+    fs << "squares_y" << board->getChessboardSize().height;
+
+    return true;
+}
 
 /**
  */
@@ -147,7 +168,7 @@ int main(int argc, char *argv[]) {
     CommandLineParser parser(argc, argv, keys);
     parser.about(about);
 
-    if(argc < 7) {
+    if(argc < 8) {
         parser.printMessage();
         return 0;
     }
@@ -158,6 +179,7 @@ int main(int argc, char *argv[]) {
     float markerLength = parser.get<float>("ml");
     int dictionaryId = parser.get<int>("d");
     string outputFile = parser.get<string>(0);
+    String outFileBoard = parser.get<String>(1);
 
     bool showChessboardCorners = parser.get<bool>("sc");
 
@@ -198,7 +220,7 @@ int main(int argc, char *argv[]) {
         inputVideo.open(video);
         waitTime = 0;
     } else {
-        inputVideo.open("v4l2src device=/dev/video0 ! videoscale ! video/x-raw, width=640 ! videoconvert ! queue ! appsink", CAP_GSTREAMER);
+        inputVideo.open("v4l2src device=/dev/video0 ! image/jpeg, width=1280 ! queue ! jpegdec ! videoconvert ! queue ! appsink", CAP_GSTREAMER);
         //inputVideo.set(cv::CAP_PROP_FRAME_WIDTH, 640);
         //inputVideo.set(cv::CAP_PROP_FRAME_HEIGHT, 480);
         waitTime = 10;
@@ -251,12 +273,11 @@ int main(int argc, char *argv[]) {
         char key = (char)waitKey(waitTime);
         if(key == 27) break;
         if(key == 'c' && ids.size() > 4 && corners.size() > 0 && corners.size() == ids.size()) {
-            cout << "Frame captured" << endl;
+            cout << "Frame captured \a" << endl;
             allCorners.push_back(corners);
             allIds.push_back(ids);
             allImgs.push_back(image);
             imgSize = image.size();
-            cout << "\a";
         }
     }
 
@@ -311,6 +332,9 @@ int main(int argc, char *argv[]) {
         allCharucoCorners.push_back(currentCharucoCorners);
         allCharucoIds.push_back(currentCharucoIds);
         filteredImages.push_back(allImgs[i]);
+        char name[20];
+        sprintf(name, "imag_%i.png", i);
+        imwrite(cv::String(name), allImgs[i]);
     }
 
     if(allCharucoCorners.size() < 4) {
@@ -326,6 +350,12 @@ int main(int argc, char *argv[]) {
 
     bool saveOk =  saveCameraParams(outputFile, imgSize, aspectRatio, calibrationFlags,
                                     cameraMatrix, distCoeffs, repError);
+    if(!saveOk) {
+        cerr << "Cannot save output file" << endl;
+        return 0;
+    }
+
+    saveOk =  saveBoardParams(outFileBoard, dictionaryId, charucoboard);
     if(!saveOk) {
         cerr << "Cannot save output file" << endl;
         return 0;
