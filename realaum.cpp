@@ -98,7 +98,6 @@ char* pi_credentials;
 string pathToCameraParameters;
 string pathToBoardParameters;
 double far=100, near=0.1; //São alterados abaixo
-glm::mat4 scale_matrix = glm::mat4(1.0f);
 string modelPath;
 char autoScaleAxis = 'n';
 string iphost = "\0";
@@ -204,7 +203,7 @@ int main(int argc, char** argv)
     cout << "step: " << step << endl;
     glm::mat4 model(1.0f);
     glm::vec4 lightPos(0.0f, 0.0f, cd.getBoardHeight()*5, 1.0f); //Valor obtidos experimentalmente
-    scale_matrix = glm::scale(glm::mat4(1.0f), glm::vec3(scale));
+    model = glm::scale(glm::mat4(1.0f), glm::vec3(scale));
     
     int fps=0;
     unsigned long int frames = 0;
@@ -256,8 +255,7 @@ int main(int argc, char** argv)
         ourShader.use();
         ourShader.setMat4("projection", projection);
         ourShader.setMat4("view", viewMatrix);
-        ourShader.setMat4("transrot", model);
-        ourShader.setMat4("scalematrix", scale_matrix);
+        ourShader.setMat4("model", model);
         glm::vec3 camera_position = -glm::transpose(glm::mat3(viewMatrix))*glm::vec3(viewMatrix[3]);
         ourShader.setVec3("camera_position", camera_position);
         ourShader.setVec3("lightPos", lightPos[0], lightPos[1], lightPos[2]);
@@ -302,7 +300,7 @@ int main(int argc, char** argv)
         char key = waitKey(1);
         if(key == 27)
             glfwSetWindowShouldClose(window, true);
-        else
+        else if(key != -1)
             processInputCV(key, step, model);
         
 
@@ -465,48 +463,64 @@ glm::mat4 getProjetionMatrix(Mat cameraMatrix, int screenWidth, int screenHeight
 
 void processInputCV(char key, float& step, glm::mat4& model){
     int sentido = 1, angle = 0;
+    glm::vec4 temp_trans = glm::vec4(1.0f);
     switch(key){
         case 'w':
-            model = model * glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, step, 0.0f));
+            model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, step, 0.0f)) * model;
             break;
         case 's':
-            model = model * glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -step, 0.0f));
+            model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -step, 0.0f)) * model;
             break;
         case 'd':
-            model = model * glm::translate(glm::mat4(1.0f), glm::vec3(step, 0.0f, 0.0f));
+            model = glm::translate(glm::mat4(1.0f), glm::vec3(step, 0.0f, 0.0f)) * model;
             break;
         case 'a':
-            model = model * glm::translate(glm::mat4(1.0f), glm::vec3(-step, 0.0f, 0.0f));
+            model = glm::translate(glm::mat4(1.0f), glm::vec3(-step, 0.0f, 0.0f)) * model;
             break;
         case 'q':
-            model = model * glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, step));
+            model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, step)) * model;
             break;
         case 'e':
-            model = model * glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -step));
+            model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -step)) * model;
             break;
         case 'Z':
-            scale_matrix = glm::scale(scale_matrix, glm::vec3(2.0f, 2.0f, 2.0f));
+            model = glm::scale(glm::mat4(1.0f), glm::vec3(2.0f, 2.0f, 2.0f)) * model;
             break;
         case 'z':
-            scale_matrix = glm::scale(scale_matrix, glm::vec3(0.5f, 0.5f, 0.5f));
+            model = glm::scale(glm::mat4(1.0f), glm::vec3(0.5f, 0.5f, 0.5f)) * model;
             break;
         case 'i':
             sentido = -1;
         case 'I':
+            //Zera translação da matriz de modelo
+            temp_trans = model[3];
+            model[3] = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+
             angle = 90.0*sentido;                                
-            model = glm::rotate(model, glm::radians((float) angle), glm::vec3(1.0, 0.0, 0.0));
+            model = glm::rotate(glm::mat4(1.0f), glm::radians((float) angle), glm::vec3(1.0, 0.0, 0.0)) * model;
+            model[3] = temp_trans;
             break;
         case 'j':
             sentido = -1;
         case 'J':
+            //Zera translação da matriz de modelo
+            temp_trans = model[3];
+            model[3] = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+
             angle = 90.0*sentido;                               
             model = glm::rotate(model, glm::radians((float) angle), glm::vec3(0.0, 1.0, 0.0));
+            model[3] = temp_trans;
             break;
         case 'k':
             sentido = -1;
         case 'K':
+            //Zera translação da matriz de modelo
+            temp_trans = model[3];
+            model[3] = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+            
             angle = 90.0*sentido;                                
             model = glm::rotate(model, glm::radians((float) angle), glm::vec3(0.0, 0.0, 1.0));
+            model[3] = temp_trans;
             break;
     }     
 }
