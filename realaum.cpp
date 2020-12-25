@@ -7,8 +7,6 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#define GLM_ENABLE_EXPERIMENTAL
-#include <glm/gtx/string_cast.hpp>
 
 #include <learnopengl/shader.h>
 #include <learnopengl/model.h>
@@ -251,7 +249,6 @@ int main(int argc, char** argv)
 
         glEnable(GL_DEPTH_TEST);
 
-        glm::to_string(model);
         ourShader.use();
         ourShader.setMat4("projection", projection);
         ourShader.setMat4("view", viewMatrix);
@@ -404,7 +401,7 @@ void processArgs(int argc, char** argv){
             cout << "Minimal usage: ./oficial.out -d -cp <path to camera parameters> -m <path to model> -bp <path to board parameters>" << endl
                  << "Options:" << endl 
                  << "-d : [Optional] Debug mode" << endl
-                 << "-f : [Optional] Informs if image must be fliped in horizontal axis" << endl
+                 << "-f : [Optional] Informs if image must be flipped in horizontal axis" << endl
                  << "-a <axis>: [Optional] Informs the autoscale axis. Case not informed, autoscale is going to be disabled" << endl 
                  << "-c <index>: [Optional] Informs index of local camera (-d) or pi camera (-pi). Default: 0" << endl 
                  << "-m <path>: [Required] Model Path" << endl
