@@ -27,8 +27,8 @@ sudo apt-get install gstreamer1.0-omx
 ```
 
 7. Compila o oficial.cpp e roda utilizando 
-    - `./oficial.out -cp ./cameraParameters.txt -d -m <caminho do modelo> -bp ./charucoBoardParams.txt -a x` para testar usando a camera do proprio computador (sem mandar para o dispositivo móvel) e redimensionando objeto de modo que seja igual ao tamanho do tabuleiro no eixo x.
-    - `./oficial -cp <caminho dos arquivo com parâmetros de calibração> -m <caminho do modelo> -bp ./charucoBoardParams.txt` para usar a câmera do próprio computador porém enviando para o celular as imagens finais
-    - `./oficial -cp <caminho dos arquivo com parâmetros de calibração> -pi <login_pi>@<ip_pi>` Para utilizar o programa com o raspberry e o dispositivo móvel.
+    - `./oficial.out -cp <caminho dos arquivo com parâmetros de calibração> -d -m <caminho do modelo> -bp <arquivo parâmetros tabuleiro> -a x` para testar usando a camera do proprio computador (sem mandar para o dispositivo móvel) e redimensionando objeto de modo que seja igual ao tamanho do tabuleiro no eixo x.
+    - `./oficial -cp <caminho dos arquivo com parâmetros de calibração> -m <caminho do modelo> -bp <arquivo parâmetros tabuleiro>` para usar a câmera do próprio computador porém enviando para o celular as imagens finais
+    - `./oficial -cp <caminho dos arquivo com parâmetros de calibração> -m <caminho do modelo> -bp <arquivo parâmetros tabuleiro> -pi <login_pi>@<ip_pi>` Para utilizar o programa com o raspberry e o dispositivo móvel.
 
-8. Pipeline do raspberry (caso necessário para debug): gst-launch-1.0 -vvv v4l2src device=/dev/video0 ! videoconvert ! video/x-raw, width=640 ! videorate ! video/x-raw, framerate=20/1 ! queue ! omxh264enc ! rtph264pay config-interval=1 ! queue ! udpsink port=5000 host=**ip_computador**
+8. Pipeline do raspberry (caso necessário para debug): gst-launch-1.0 -vvv v4l2src device=/dev/video{cameraIndex} ! image/jpeg, width={width}, height={height} ! videorate ! image/jpeg, framerate={framerate}/1 ! queue ! rtpjpegpay ! udpsink port=5000 host={ip_computador}
